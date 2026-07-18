@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * デザイントークン（CSS 変数）。
+ * 値は「R G B」形式で保持し、tailwind.config.ts 側で
+ * rgb(var(--x) / <alpha-value>) として参照する。
+ * 白基調 + 薄いグレー背景 + 濃紺の主要色 + 推奨数量のみ濃い赤。
+ */
+:root {
+  --color-bg: 247 248 250; /* #f7f8fa 薄いグレー背景 */
+  --color-surface: 255 255 255; /* #ffffff 面（カード等） */
+  --color-border: 226 230 235; /* #e2e6eb 罫線 */
+  --color-foreground: 26 36 48; /* #1a2430 本文 */
+  --color-muted: 82 93 107; /* #525d6b 補助テキスト（AA確保） */
+  --color-muted-bg: 240 242 245; /* #f0f2f5 うすい面 */
+
+  --color-primary: 15 61 92; /* #0f3d5c 濃紺（主要色） */
+  --color-primary-hover: 11 47 71; /* #0b2f47 */
+  --color-primary-fg: 255 255 255; /* #ffffff 主要色上の文字 */
+  --color-accent: 14 90 86; /* #0e5a56 深い青緑 */
+
+  --color-recommend: 192 38 30; /* #c0261e 推奨数量専用の濃い赤 */
+
+  --color-up: 180 74 8; /* #b44a08 増加=オレンジ（AA） */
+  --color-down: 19 76 120; /* #134c78 減少=青 */
+  --color-good: 21 106 61; /* #156a3d 良好=緑 */
+  --color-warn: 158 78 8; /* #9e4e08 注意=オレンジ */
+  --color-bad: 176 30 22; /* #b01e16 危険=赤 */
+  --color-ref: 91 102 116; /* #5b6674 参考値=グレー */
+}
+
+@layer base {
+  html {
+    /* 文字最小 16px を基準に */
+    font-size: 16px;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family:
+      'Noto Sans JP', system-ui, -apple-system, 'Hiragino Sans',
+      'Yu Gothic', 'Meiryo', sans-serif;
+  }
+
+  /* キーボード操作時のフォーカスを明示（アクセシビリティ） */
+  :focus-visible {
+    @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-background;
+  }
+
+  /* 数値を等幅寄りに表示し、桁を読みやすく */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
