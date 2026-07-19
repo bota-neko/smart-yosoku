@@ -79,14 +79,16 @@ interface ProductDef {
   base: number;
   isNew?: boolean;
   caseSize?: number;
+  price?: number;
+  cost?: number;
 }
 
 const PRODUCTS: ProductDef[] = [
-  { id: 'momen', name: '木綿豆腐', unit: '丁', allowDecimal: false, base: 120 },
-  { id: 'kinu', name: '絹ごし豆腐', unit: '丁', allowDecimal: false, base: 96 },
-  { id: 'atsuage', name: '厚揚げ', unit: 'パック', allowDecimal: false, base: 70, caseSize: 20 },
-  { id: 'aburaage', name: '油揚げ', unit: 'パック', allowDecimal: false, base: 58, caseSize: 20 },
-  { id: 'okfrom', name: 'おから', unit: 'kg', allowDecimal: true, base: 14 },
+  { id: 'momen', name: '木綿豆腐', unit: '丁', allowDecimal: false, base: 120, price: 150, cost: 60 },
+  { id: 'kinu', name: '絹ごし豆腐', unit: '丁', allowDecimal: false, base: 96, price: 160, cost: 62 },
+  { id: 'atsuage', name: '厚揚げ', unit: 'パック', allowDecimal: false, base: 70, caseSize: 20, price: 130, cost: 55 },
+  { id: 'aburaage', name: '油揚げ', unit: 'パック', allowDecimal: false, base: 58, caseSize: 20, price: 110, cost: 45 },
+  { id: 'okfrom', name: 'おから', unit: 'kg', allowDecimal: true, base: 14, price: 80, cost: 30 },
 ];
 
 /** 予測対象エントリ一覧（拠点 × 商品）。 */
@@ -272,6 +274,10 @@ export interface ProductInfo {
   allowDecimal: boolean;
   /** 1ケースあたりの入数（>1でケース運用。未設定/1=ばら） */
   caseSize?: number | null;
+  /** 単価（円・任意） */
+  price?: number | null;
+  /** 原価（円・任意）。ロス金額の算出に使う */
+  cost?: number | null;
 }
 export const PRODUCT_LIST: ProductInfo[] = PRODUCTS.map((p) => ({
   id: p.id,
@@ -279,6 +285,8 @@ export const PRODUCT_LIST: ProductInfo[] = PRODUCTS.map((p) => ({
   unit: p.unit,
   allowDecimal: p.allowDecimal,
   caseSize: p.caseSize ?? null,
+  price: p.price ?? null,
+  cost: p.cost ?? null,
 }));
 
 export function findProduct(id: string): ProductInfo | undefined {

@@ -27,6 +27,7 @@ import { useLocations, activeLocations, handlesProduct, type WholesaleDest } fro
 import { useProducts, activeProducts, type Product } from '@/lib/products-store';
 import { useDeliveries } from '@/lib/deliveries-store';
 import { useFactors, WEATHER_LABELS, type Weather, type DayFactor } from '@/lib/factors-store';
+import { useLosses } from '@/lib/losses-store';
 import { AutoFactorFetch } from '@/components/features/factors/auto-factor-fetch';
 import { addDays, dowLabel } from '@/domain';
 
@@ -50,6 +51,7 @@ export default function DeliveryInputPage() {
   const { products } = useProducts();
   const { map, saveValues } = useDeliveries();
   const { getFactors, saveFactors } = useFactors();
+  const { getLoss, setLoss } = useLosses();
   const locs = activeLocations(allLocs);
   const prods = activeProducts(products);
   const [date, setDate] = useState<string>(getToday());
@@ -413,6 +415,42 @@ export default function DeliveryInputPage() {
                     }`}
                   />
                   <span className="w-10 text-base text-muted">{product.unit}</span>
+                </div>
+
+                {/* 任意: 廃棄・売り切れ（ロス分析用） */}
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1 text-sm text-muted" title="廃棄・返品数（任意）">
+                    廃棄
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={getLoss(date, locationId, product.id).waste ?? ''}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/[^0-9]/g, '');
+                        setLoss(date, locationId, product.id, { waste: v === '' ? undefined : Number(v) });
+                      }}
+                      aria-label={`${product.name} の廃棄・返品数（任意）`}
+                      placeholder="—"
+                      className="h-9 w-14 rounded-md border border-border bg-surface px-2 text-right text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLoss(date, locationId, product.id, {
+                        soldOut: !getLoss(date, locationId, product.id).soldOut,
+                      })
+                    }
+                    aria-pressed={getLoss(date, locationId, product.id).soldOut}
+                    title="売り切れ（もっと売れたはず）"
+                    className={`min-h-9 rounded-md border px-2 text-sm ${
+                      getLoss(date, locationId, product.id).soldOut
+                        ? 'border-state-warn bg-state-warn/10 text-state-warn'
+                        : 'border-dashed border-border text-muted hover:bg-muted-bg'
+                    }`}
+                  >
+                    売切
+                  </button>
                 </div>
               </div>
             );

@@ -31,6 +31,8 @@ export function defaultProducts(): Product[] {
     unit: p.unit,
     allowDecimal: p.allowDecimal,
     caseSize: p.caseSize ?? null,
+    price: p.price ?? null,
+    cost: p.cost ?? null,
     active: true,
   }));
 }

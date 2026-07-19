@@ -35,10 +35,11 @@ export default function ProductsPage() {
   const [unit, setUnit] = useState('個');
   const [allowDecimal, setAllowDecimal] = useState(false);
   const [price, setPrice] = useState('');
+  const [cost, setCost] = useState('');
   const [caseSize, setCaseSize] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [edit, setEdit] = useState<{ name: string; unit: string; price: string; caseSize: string; allowDecimal: boolean }>({
-    name: '', unit: '', price: '', caseSize: '', allowDecimal: false,
+  const [edit, setEdit] = useState<{ name: string; unit: string; price: string; cost: string; caseSize: string; allowDecimal: boolean }>({
+    name: '', unit: '', price: '', cost: '', caseSize: '', allowDecimal: false,
   });
 
   const handleAdd = () => {
@@ -49,12 +50,14 @@ export default function ProductsPage() {
       unit: unit.trim() || '個',
       allowDecimal,
       price: price ? Number(price) : null,
+      cost: cost ? Number(cost) : null,
       caseSize: caseSize ? Number(caseSize) : null,
     });
     setName('');
     setUnit('個');
     setAllowDecimal(false);
     setPrice('');
+    setCost('');
     setCaseSize('');
   };
 
@@ -64,6 +67,7 @@ export default function ProductsPage() {
       name: p.name,
       unit: p.unit,
       price: p.price != null ? String(p.price) : '',
+      cost: p.cost != null ? String(p.cost) : '',
       caseSize: p.caseSize != null ? String(p.caseSize) : '',
       allowDecimal: p.allowDecimal,
     });
@@ -74,6 +78,7 @@ export default function ProductsPage() {
       name: edit.name.trim(),
       unit: edit.unit.trim() || '個',
       price: edit.price ? Number(edit.price) : null,
+      cost: edit.cost ? Number(edit.cost) : null,
       caseSize: edit.caseSize ? Number(edit.caseSize) : null,
       allowDecimal: edit.allowDecimal,
     });
@@ -128,6 +133,17 @@ export default function ProductsPage() {
               inputMode="numeric"
               value={price}
               onChange={(e) => setPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+              placeholder="円"
+              className="h-11 w-full rounded-md border border-border bg-surface px-3 text-right text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            />
+          </div>
+          <div className="w-24 space-y-1">
+            <label htmlFor="p-cost" className="text-sm font-semibold text-muted">原価（任意）</label>
+            <input
+              id="p-cost"
+              inputMode="numeric"
+              value={cost}
+              onChange={(e) => setCost(e.target.value.replace(/[^0-9.]/g, ''))}
               placeholder="円"
               className="h-11 w-full rounded-md border border-border bg-surface px-3 text-right text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             />
@@ -205,8 +221,15 @@ export default function ProductsPage() {
                       value={edit.price}
                       onChange={(e) => setEdit({ ...edit, price: e.target.value.replace(/[^0-9.]/g, '') })}
                       aria-label="単価"
-                      placeholder="円"
-                      className="h-10 w-24 rounded-md border border-border bg-surface px-3 text-right text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      placeholder="単価"
+                      className="h-10 w-20 rounded-md border border-border bg-surface px-3 text-right text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    />
+                    <input
+                      value={edit.cost}
+                      onChange={(e) => setEdit({ ...edit, cost: e.target.value.replace(/[^0-9.]/g, '') })}
+                      aria-label="原価"
+                      placeholder="原価"
+                      className="h-10 w-20 rounded-md border border-border bg-surface px-3 text-right text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     />
                     <input
                       value={edit.caseSize}
@@ -238,7 +261,8 @@ export default function ProductsPage() {
                       {p.name}
                     </span>
                     <Badge variant="neutral">単位: {p.unit}</Badge>
-                    {p.price != null ? <Badge variant="neutral">{p.price}円</Badge> : null}
+                    {p.price != null ? <Badge variant="neutral">単価 {p.price}円</Badge> : null}
+                    {p.cost != null ? <Badge variant="neutral">原価 {p.cost}円</Badge> : null}
                     {p.caseSize && p.caseSize > 1 ? (
                       <Badge variant="neutral">1ケース {p.caseSize}{p.unit}</Badge>
                     ) : null}

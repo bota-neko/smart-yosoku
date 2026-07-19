@@ -18,6 +18,7 @@ const STORAGE_KEYS = [
   'smart-yosoku:locations:v2',
   'smart-yosoku:deliveries:v2',
   'smart-yosoku:factors:v1',
+  'smart-yosoku:losses:v1',
   'smart-yosoku:settings:v1',
 ];
 
@@ -27,6 +28,7 @@ const CHANGE_EVENTS = [
   'smart-yosoku:locations-changed',
   'smart-yosoku:deliveries-changed',
   'smart-yosoku:factors-changed',
+  'smart-yosoku:losses-changed',
   'smart-yosoku:settings-changed',
 ];
 
@@ -78,6 +80,7 @@ function initEmptyLocal(): void {
   window.localStorage.setItem('smart-yosoku:locations:v2', '[]');
   window.localStorage.setItem('smart-yosoku:deliveries:v2', '{}');
   window.localStorage.setItem('smart-yosoku:factors:v1', '{}');
+  window.localStorage.setItem('smart-yosoku:losses:v1', '{}');
   window.localStorage.removeItem('smart-yosoku:settings:v1'); // 地域は既定のまま
 }
 

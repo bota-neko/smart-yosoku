@@ -9,6 +9,7 @@ import { resetProductsDemo } from './products-store';
 import { resetLocationsDemo } from './locations-store';
 import { resetDeliveriesDemo } from './deliveries-store';
 import { resetFactorsDemo } from './factors-store';
+import { resetLossesDemo } from './losses-store';
 import { resetSettingsDemo } from './settings-store';
 
 /** 全ストアをまとめて見本の初期状態へ戻す。 */
@@ -17,6 +18,7 @@ export function resetAllDemoData(): void {
   resetLocationsDemo();
   resetDeliveriesDemo();
   resetFactorsDemo();
+  resetLossesDemo();
   resetSettingsDemo();
 }
 

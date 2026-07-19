@@ -12,6 +12,8 @@ import {
   Factory,
   Store,
   Package,
+  Coins,
+  CalendarRange,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -32,7 +34,9 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/locations', label: '卸先管理', icon: Store },
   { href: '/input', label: '納品入力', icon: PencilLine },
   { href: '/summary', label: '製造計画（合計予測）', icon: Factory },
+  { href: '/weekly', label: '週間予測', icon: CalendarRange },
   { href: '/forecast', label: '予測詳細', icon: TrendingUp },
+  { href: '/loss', label: 'ロス・効果', icon: Coins },
   { href: '/accuracy', label: '予測精度', icon: Target },
 ];
 
