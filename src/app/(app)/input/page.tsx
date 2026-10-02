@@ -29,6 +29,7 @@ import { useDeliveries } from '@/lib/deliveries-store';
 import { useFactors, WEATHER_LABELS, type Weather, type DayFactor } from '@/lib/factors-store';
 import { useLosses } from '@/lib/losses-store';
 import { AutoFactorFetch } from '@/components/features/factors/auto-factor-fetch';
+import { SlipScanner, type SlipApply } from '@/components/features/slip/slip-scanner';
 import { addDays, dowLabel } from '@/domain';
 
 /**
@@ -60,6 +61,9 @@ export default function DeliveryInputPage() {
   // 選択中の日付について、納品実績ストアの内容を初期表示し、保存でストアへ書き戻す。
   const [values, setValues] = useState<Record<string, string>>({});
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  // 納品書の読み取り結果（日付切替による再読込のあとで入力欄へ重ねる）
+  const [pendingScan, setPendingScan] = useState<SlipApply | null>(null);
+  const [scanNotice, setScanNotice] = useState<string | null>(null);
 
   // 選択中の卸先が無効/未選択なら先頭へ寄せる
   useEffect(() => {
@@ -90,6 +94,27 @@ export default function DeliveryInputPage() {
     // locs/prods は毎レンダー生成のため依存は date と map に限定（内容変化で再読込）
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, map]);
+
+  // 納品書の読み取り結果を、対象日の入力欄へ下書きとして反映（保存は利用者が行う）
+  useEffect(() => {
+    if (!pendingScan || pendingScan.date !== date) return;
+    const scan = pendingScan;
+    setValues((prev) => {
+      const next = { ...prev };
+      for (const [productId, qty] of Object.entries(scan.values)) {
+        next[key(scan.locationId, productId)] = String(qty);
+      }
+      return next;
+    });
+    setLocationId(scan.locationId);
+    setPendingScan(null);
+    setSavedAt(null);
+    const name = locs.find((l) => l.id === scan.locationId)?.name ?? '';
+    setScanNotice(
+      `納品書から ${name} の ${Object.keys(scan.values).length} 品目を入力しました。内容を確認して「この日の納品を保存」を押してください。`,
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingScan, date]);
 
   const location = locs.find((l) => l.id === locationId);
 
@@ -159,6 +184,7 @@ export default function DeliveryInputPage() {
       return { productId: p.id, value: raw === '' ? null : Number(raw) };
     });
     saveValues(date, locationId, entries);
+    setScanNotice(null);
     setSavedAt(
       new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
     );
@@ -214,6 +240,24 @@ export default function DeliveryInputPage() {
           <span className="ml-auto text-base font-medium">{dateLabel}</span>
         </CardContent>
       </Card>
+
+      {/* 1.2 納品書の撮影・アップロードで自動入力 */}
+      <SlipScanner
+        products={prods}
+        locations={locs}
+        currentDate={date}
+        today={getToday()}
+        onApply={(a) => {
+          setPendingScan(a);
+          setDate(a.date);
+        }}
+      />
+      {scanNotice ? (
+        <p className="flex items-start gap-2 rounded-md border border-primary bg-primary/10 p-3 text-base" role="status">
+          <Check className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+          {scanNotice}
+        </p>
+      ) : null}
 
       {/* 1.5 その日の状況（外部要因）— 予測に反映 */}
       <Card>

@@ -44,6 +44,12 @@ Import 画面の **Environment Variables** に、`.env.local` と同じ値を追
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://csbgejtoqaonhcusfktt.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `sb_publishable_...`（Publishable key） |
+| `API_KEY_ENCRYPTION_SECRET` | `.env.local` と同じ値（納品書読み取り用。**サーバー専用・公開しない**） |
+
+> 納品書の読み取りは「各自の Claude APIキー・各自払い」方式です。利用者が「設定」画面でキーを登録し、
+> サーバーは `API_KEY_ENCRYPTION_SECRET` で暗号化して Supabase（`user_api_keys`）に保存します。
+> この値は**一度決めたら変えない**でください（変えると登録済みのキーが復号できず、全員の再登録が必要になります）。
+> 事前に Supabase の SQL Editor で `supabase/migrations/0005_user_api_keys.sql` を実行しておきます。
 
 → **Deploy** を押す。数分で `https://<プロジェクト>.vercel.app` が発行されます。
 

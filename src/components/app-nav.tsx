@@ -14,6 +14,7 @@ import {
   Package,
   Coins,
   CalendarRange,
+  Settings,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -38,6 +39,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/forecast', label: '予測詳細', icon: TrendingUp },
   { href: '/loss', label: 'ロス・効果', icon: Coins },
   { href: '/accuracy', label: '予測精度', icon: Target },
+  { href: '/settings', label: '設定', icon: Settings },
 ];
 
 export function AppNav() {
