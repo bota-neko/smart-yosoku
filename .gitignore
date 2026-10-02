@@ -13,3 +13,4 @@ playwright-report/
 test-results/
 supabase/seed/seed-data.json
 .DS_Store
+supabase/.temp/
