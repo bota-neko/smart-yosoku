@@ -67,7 +67,7 @@ export function ApiKeyCard() {
       <CardContent className="space-y-4">
         <p className="text-base text-muted">
           納品書の写真の読み取りには、ご自身の Claude APIキーを使います。読み取りの利用料はご自身の Anthropic
-          アカウントに直接請求されます（目安：1枚あたり数円〜10円ほど）。
+          アカウントに直接請求されます（目安：1枚あたり1円前後・1日20枚で月数百円ほど）。
         </p>
 
         {!configured || (!loading && !user) ? (

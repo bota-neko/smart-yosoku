@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
-import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
+import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import * as z from 'zod/v4';
 import { createClient } from '@/lib/supabase/server';
 import { loadUserApiKey } from '@/lib/server/user-api-key';
@@ -152,13 +152,11 @@ export async function POST(req: Request) {
 
   const client = new Anthropic({ apiKey });
   try {
-    const response = await client.beta.messages.parse({
-      model: 'claude-opus-5-5',
+    // 書き写し中心の作業なので、費用の安い Haiku を使う（利用料は本人負担）
+    const response = await client.messages.parse({
+      model: 'claude-haiku-4-5',
       max_tokens: 16000,
-      // 安全判定で断られた場合はサーバー側で自動的に別モデルへ切り替える
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
-      output_config: { effort: 'medium', format: betaZodOutputFormat(SlipSchema) },
+      output_config: { format: zodOutputFormat(SlipSchema) },
       system: SYSTEM_PROMPT,
       messages: [
         {
