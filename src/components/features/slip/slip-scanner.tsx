@@ -160,7 +160,8 @@ export function SlipScanner({
   };
 
   const loggedIn = configured && !!user;
-  const canUse = loggedIn && !!status?.registered;
+  const hasMaster = products.length > 0 && locations.length > 0;
+  const canUse = loggedIn && !!status?.registered && hasMaster;
 
   return (
     <Card>
@@ -202,7 +203,23 @@ export function SlipScanner({
                 }}
               />
             </div>
-          ) : statusLoading ? null : loggedIn ? (
+          ) : statusLoading ? null : loggedIn && status?.registered && !hasMaster ? (
+            <p className="text-sm text-muted">
+              先に
+              {products.length === 0 ? (
+                <Link href="/products" className="text-primary hover:underline">
+                  商品
+                </Link>
+              ) : null}
+              {products.length === 0 && locations.length === 0 ? 'と' : null}
+              {locations.length === 0 ? (
+                <Link href="/locations" className="text-primary hover:underline">
+                  卸先
+                </Link>
+              ) : null}
+              を登録すると使えます（納品書の品名・宛先と照らし合わせるため）
+            </p>
+          ) : loggedIn ? (
             <p className="text-sm text-muted">
               <Link href="/settings" className="text-primary hover:underline">
                 設定

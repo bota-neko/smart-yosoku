@@ -36,7 +36,6 @@ const RequestSchema = z.object({
         caseSize: z.number().int().positive().optional(),
       }),
     )
-    .min(1)
     .max(200),
   locations: z
     .array(z.object({ id: z.string().max(64), name: z.string().max(100) }))
@@ -119,8 +118,17 @@ export async function POST(req: Request) {
   let body: z.infer<typeof RequestSchema>;
   try {
     const parsed = RequestSchema.safeParse(await req.json());
-    if (!parsed.success) return error(400, '画像または送信内容が正しくありません。');
+    if (!parsed.success) {
+      const path = parsed.error.issues[0]?.path[0];
+      if (path === 'image' || path === 'mediaType') {
+        return error(400, '画像を送れませんでした。別の写真でお試しください。');
+      }
+      return error(400, '商品・卸先の登録内容を読み込めませんでした。ページを再読み込みしてお試しください。');
+    }
     body = parsed.data;
+    if (body.products.length === 0) {
+      return error(400, '先に「商品管理」で商品を登録してください（納品書の品名と照らし合わせるため）。');
+    }
   } catch {
     return error(400, '画像のサイズが大きすぎるか、送信内容が正しくありません。');
   }
