@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import {
   Package,
@@ -12,6 +13,7 @@ import {
   Info,
   ChevronUp,
   ChevronDown,
+  ArrowLeft,
 } from 'lucide-react';
 import {
   Card,
@@ -26,7 +28,7 @@ import { resetAllDemoData } from '@/lib/demo-data';
 
 /**
  * 商品管理（予測対象＝豆腐などの商品を登録・編集・削除）。
- * ここで登録した商品が、卸先の取扱商品・納品入力・予測・製造計画に反映される。
+ * ここで登録した商品が、お店の取扱商品・納品の記録・予測・製造計画に反映される。
  * デモでは localStorage 保存。Supabase 接続時は forecast_targets へ。
  */
 export default function ProductsPage() {
@@ -87,10 +89,14 @@ export default function ProductsPage() {
 
   return (
     <div className="space-y-6">
+      <Link href="/settings" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+        設定へ戻る
+      </Link>
       <header className="space-y-1">
-        <h1 className="text-2xl font-bold">商品管理</h1>
+        <h1 className="text-2xl font-bold">商品</h1>
         <p className="text-muted">
-          予測する商品を登録します。ここで登録した商品が、卸先の取扱商品・納品入力・予測・製造計画に反映されます。
+          予測する商品を登録します。ここで登録した商品が、お店の取扱商品・納品の記録・予測・製造計画に反映されます。
         </p>
       </header>
 
@@ -186,7 +192,7 @@ export default function ProductsPage() {
             size="sm"
             variant="outline"
             onClick={() => {
-              if (confirm('商品・卸先・納品実績をすべて見本の初期状態に戻します。よろしいですか？')) {
+              if (confirm('商品・お店・納品実績をすべて見本の初期状態に戻します。よろしいですか？')) {
                 resetAllDemoData();
               }
             }}
@@ -316,7 +322,7 @@ export default function ProductsPage() {
         <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
         <span>
           新しく追加した商品は過去の実績が無いため、予測は当面「参考値」になります。
-          どの卸先がどの商品を扱うかは「卸先管理」の各卸先で設定できます。
+          どのお店がどの商品を扱うかは「設定」→「お店」の各お店で設定できます。
         </span>
       </p>
     </div>

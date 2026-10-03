@@ -31,7 +31,7 @@ export function AuthStatus() {
             router.push('/');
             router.refresh();
           }}
-          className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-primary-fg/30 px-3 text-sm hover:bg-primary-fg/10"
+          className="inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-md border border-primary-fg/30 px-3 text-sm hover:bg-primary-fg/10"
         >
           <LogOut className="h-4 w-4" aria-hidden="true" />
           ログアウト
@@ -51,14 +51,14 @@ export function AuthStatus() {
         <>
           <Link
             href="/login"
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-md px-3 text-sm hover:bg-primary-fg/10"
+            className="inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-sm hover:bg-primary-fg/10"
           >
             <LogIn className="h-4 w-4" aria-hidden="true" />
             ログイン
           </Link>
           <Link
             href="/signup"
-            className="inline-flex min-h-9 items-center rounded-md bg-primary-fg px-3 text-sm font-medium text-primary hover:opacity-90"
+            className="inline-flex min-h-9 items-center whitespace-nowrap rounded-md bg-primary-fg px-3 text-sm font-medium text-primary hover:opacity-90"
           >
             新規登録
           </Link>

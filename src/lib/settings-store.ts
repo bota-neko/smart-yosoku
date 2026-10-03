@@ -65,3 +65,8 @@ export function useSettings() {
 export function resetSettingsDemo(): void {
   write(DEFAULT_SETTINGS);
 }
+
+/** 現在の地域設定を読む（フック外から）。 */
+export function readSettings(): OrgSettings {
+  return read();
+}

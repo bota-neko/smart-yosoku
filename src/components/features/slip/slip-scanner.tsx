@@ -164,77 +164,83 @@ export function SlipScanner({
   const canUse = loggedIn && !!status?.registered && hasMaster;
 
   return (
+    <>
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => {
+          void handleFile(e.target.files?.[0]);
+          e.target.value = '';
+        }}
+      />
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          void handleFile(e.target.files?.[0]);
+          e.target.value = '';
+        }}
+      />
     <Card>
       <CardContent className="space-y-3 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="inline-flex items-center gap-2 text-sm font-semibold text-muted">
-            <ScanLine className="h-5 w-5 text-primary" aria-hidden="true" />
-            納品書から読み取る（撮影・画像アップロード）
-          </p>
-          {canUse ? (
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" onClick={() => cameraRef.current?.click()} disabled={busy}>
-                <Camera className="h-4 w-4" aria-hidden="true" />
-                撮影する
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={busy}>
+        {canUse ? (
+          <div className="space-y-2">
+            <Button className="h-20 w-full flex-col gap-1 text-lg" onClick={() => cameraRef.current?.click()} disabled={busy}>
+              <Camera className="h-7 w-7" aria-hidden="true" />
+              納品書を撮る
+            </Button>
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={busy}
+                className="inline-flex min-h-10 items-center gap-1.5 px-2 text-sm text-primary hover:underline"
+              >
                 <ImageUp className="h-4 w-4" aria-hidden="true" />
-                画像を選ぶ
-              </Button>
-              <input
-                ref={cameraRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={(e) => {
-                  void handleFile(e.target.files?.[0]);
-                  e.target.value = '';
-                }}
-              />
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  void handleFile(e.target.files?.[0]);
-                  e.target.value = '';
-                }}
-              />
+                撮った写真を選ぶ（パソコンはこちら）
+              </button>
             </div>
-          ) : statusLoading ? null : loggedIn && status?.registered && !hasMaster ? (
-            <p className="text-sm text-muted">
-              先に
-              {products.length === 0 ? (
-                <Link href="/products" className="text-primary hover:underline">
-                  商品
-                </Link>
-              ) : null}
-              {products.length === 0 && locations.length === 0 ? 'と' : null}
-              {locations.length === 0 ? (
-                <Link href="/locations" className="text-primary hover:underline">
-                  卸先
-                </Link>
-              ) : null}
-              を登録すると使えます（納品書の品名・宛先と照らし合わせるため）
+          </div>
+        ) : statusLoading ? null : (
+          <div className="flex items-start gap-3">
+            <ScanLine className="mt-0.5 h-6 w-6 shrink-0 text-muted" aria-hidden="true" />
+            <p className="text-base text-muted">
+              {!loggedIn ? (
+                <>
+                  納品書を撮るだけで記録できます。
+                  <Link href="/login" className="text-primary hover:underline">
+                    ログイン
+                  </Link>
+                  すると使えます。
+                </>
+              ) : !status?.registered ? (
+                <>
+                  納品書を撮るだけで記録できます。
+                  <Link href="/settings" className="text-primary hover:underline">
+                    設定
+                  </Link>
+                  で Claude の APIキーを登録すると使えます。
+                </>
+              ) : (
+                <>
+                  先に
+                  <Link href="/settings" className="text-primary hover:underline">
+                    設定
+                  </Link>
+                  で{products.length === 0 ? '商品' : ''}
+                  {products.length === 0 && locations.length === 0 ? 'と' : ''}
+                  {locations.length === 0 ? 'お店' : ''}
+                  を登録すると使えます（納品書と照らし合わせるため）。
+                </>
+              )}
             </p>
-          ) : loggedIn ? (
-            <p className="text-sm text-muted">
-              <Link href="/settings" className="text-primary hover:underline">
-                設定
-              </Link>
-              で Claude の APIキーを登録すると使えます
-            </p>
-          ) : (
-            <p className="text-sm text-muted">
-              <Link href="/login" className="text-primary hover:underline">
-                ログイン
-              </Link>
-              すると使えます
-            </p>
-          )}
-        </div>
+          </div>
+        )}
 
         {busy ? (
           <p className="inline-flex items-center gap-2 text-base" role="status">
@@ -270,7 +276,7 @@ export function SlipScanner({
                 />
               </label>
               <label className="flex items-center gap-2 text-base">
-                卸先
+                お店
                 <select
                   value={review.locationId}
                   onChange={(e) => setReview({ ...review, locationId: e.target.value })}
@@ -328,7 +334,7 @@ export function SlipScanner({
                     {!r.productId ? (
                       <span className="w-full text-xs text-state-warn">登録商品と一致しませんでした。取り込む商品を選んでください。</span>
                     ) : notHandled ? (
-                      <span className="w-full text-xs text-state-warn">この卸先の取扱商品ではないため取り込まれません（卸先管理で追加できます）。</span>
+                      <span className="w-full text-xs text-state-warn">このお店の取扱商品ではないため取り込まれません（設定 → お店で追加できます）。</span>
                     ) : null}
                   </li>
                 );
@@ -338,7 +344,7 @@ export function SlipScanner({
             {review.result.note ? <p className="text-sm text-muted">メモ：{review.result.note}</p> : null}
 
             <div className="flex flex-wrap items-center justify-end gap-3">
-              {!reviewLoc ? <span className="text-sm text-state-warn">卸先を選んでください</span> : null}
+              {!reviewLoc ? <span className="text-sm text-state-warn">お店を選んでください</span> : null}
               <Button variant="outline" onClick={() => setReview(null)}>
                 やめる
               </Button>
@@ -347,12 +353,13 @@ export function SlipScanner({
               </Button>
             </div>
           </div>
-        ) : (
-          <p className="text-xs text-muted">
-            納品書の写真から、卸先・日付・商品ごとの数を読み取って入力欄に下書きします。内容を確認してから「この日の納品を保存」を押してください。画像は保存されません。読み取りの利用料は、登録したご自身の APIキーに請求されます。
+        ) : canUse ? (
+          <p className="text-center text-xs text-muted">
+            読み取った内容を確認してから保存します。写真は保存されません。
           </p>
-        )}
+        ) : null}
       </CardContent>
     </Card>
+    </>
   );
 }

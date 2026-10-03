@@ -16,7 +16,7 @@ import { addDays } from '@/domain';
 import { TARGETS, buildHistory, getToday } from './sample-data';
 
 /** key = `${date}|${locationId}|${productId}` -> 納品数(個)。キーが無い=未入力(null)。 */
-type DeliveryMap = Record<string, number>;
+export type DeliveryMap = Record<string, number>;
 
 const STORAGE_KEY = 'smart-yosoku:deliveries:v2';
 const SEED_HISTORY_DAYS = 150;

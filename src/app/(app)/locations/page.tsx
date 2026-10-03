@@ -12,6 +12,7 @@ import {
   RotateCcw,
   Info,
   Package,
+  ArrowLeft,
 } from 'lucide-react';
 import {
   Card,
@@ -26,9 +27,9 @@ import { useProducts, activeProducts } from '@/lib/products-store';
 import { resetAllDemoData } from '@/lib/demo-data';
 
 /**
- * 卸先管理（お店＝納品先の登録・編集・削除）。
+ * お店管理（お店＝納品先の登録・編集・削除）。
  *
- * ここで登録した卸先が、納品入力のタブ・製造計画（合計予測）・予測に連動する。
+ * ここで登録したお店が、納品の記録のタブ・製造計画（合計予測）・予測に連動する。
  * デモではブラウザ内（localStorage）に保存。Supabase 接続時は locations テーブルへ。
  */
 export default function LocationsPage() {
@@ -42,7 +43,7 @@ export default function LocationsPage() {
   const [editKind, setEditKind] = useState('');
   const [openProductsId, setOpenProductsId] = useState<string | null>(null);
 
-  /** 卸先の取扱商品をトグル（productIds未設定=全扱いを、明示リストへ切替）。 */
+  /** お店の取扱商品をトグル（productIds未設定=全扱いを、明示リストへ切替）。 */
   const toggleProduct = (loc: WholesaleDest, productId: string) => {
     const current = loc.productIds ?? prods.map((p) => p.id);
     const set = new Set(current);
@@ -58,21 +59,21 @@ export default function LocationsPage() {
   const handledCount = (loc: WholesaleDest) =>
     loc.productIds ? loc.productIds.length : prods.length;
 
-  /** 卸先の既定安全率(%)を設定（空なら未設定=全体既定へ）。 */
+  /** お店の既定安全率(%)を設定（空なら未設定=全体既定へ）。 */
   const setLocSafety = (loc: WholesaleDest, pct: string) => {
     update(loc.id, { safetyRate: pct === '' ? undefined : Number(pct) / 100 });
   };
-  /** (卸先×商品)の安全率(%)を設定（空なら卸先既定へ戻す）。 */
+  /** (お店×商品)の安全率(%)を設定（空ならお店既定へ戻す）。 */
   const setPairSafety = (loc: WholesaleDest, productId: string, pct: string) => {
     const rates = { ...(loc.safetyRates ?? {}) };
     if (pct === '') delete rates[productId];
     else rates[productId] = Number(pct) / 100;
     update(loc.id, { safetyRates: Object.keys(rates).length ? rates : undefined });
   };
-  /** 表示用: 卸先の既定安全率% */
+  /** 表示用: お店の既定安全率% */
   const locSafetyPct = (loc: WholesaleDest) =>
     loc.safetyRate != null ? String(Math.round(loc.safetyRate * 100)) : '';
-  /** 表示用: (卸先×商品)の安全率%（未設定は空） */
+  /** 表示用: (お店×商品)の安全率%（未設定は空） */
   const pairSafetyPct = (loc: WholesaleDest, productId: string) => {
     const v = loc.safetyRates?.[productId];
     return v != null ? String(Math.round(v * 100)) : '';
@@ -101,10 +102,14 @@ export default function LocationsPage() {
 
   return (
     <div className="space-y-6">
+      <Link href="/settings" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+        設定へ戻る
+      </Link>
       <header className="space-y-1">
-        <h1 className="text-2xl font-bold">卸先管理</h1>
+        <h1 className="text-2xl font-bold">お店</h1>
         <p className="text-muted">
-          商品を卸すお店（納品先）を登録します。ここで登録した卸先が、納品入力・予測・製造計画に反映されます。
+          商品を卸すお店（納品先）を登録します。ここで登録したお店が、納品の記録・予測・製造計画に反映されます。
         </p>
       </header>
 
@@ -113,13 +118,13 @@ export default function LocationsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Plus className="h-5 w-5 text-primary" aria-hidden="true" />
-            卸先を追加
+            お店を追加
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-3">
           <div className="flex-1 space-y-1">
             <label htmlFor="loc-name" className="text-sm font-semibold text-muted">
-              卸先名（お店の名前）<span className="text-state-bad">必須</span>
+              お店の名前<span className="text-state-bad">必須</span>
             </label>
             <input
               id="loc-name"
@@ -157,13 +162,13 @@ export default function LocationsPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-lg">
             <Store className="h-5 w-5 text-primary" aria-hidden="true" />
-            登録済みの卸先（{locations.length}件）
+            登録済みのお店（{locations.length}件）
           </CardTitle>
           <Button
             size="sm"
             variant="outline"
             onClick={() => {
-              if (confirm('商品・卸先・納品実績をすべて見本の初期状態に戻します。よろしいですか？')) {
+              if (confirm('商品・お店・納品実績をすべて見本の初期状態に戻します。よろしいですか？')) {
                 resetAllDemoData();
               }
             }}
@@ -175,7 +180,7 @@ export default function LocationsPage() {
         <CardContent className="divide-y divide-border p-0">
           {locations.length === 0 ? (
             <p className="p-8 text-center text-muted">
-              卸先がまだありません。上のフォームから追加してください。
+              お店がまだありません。上のフォームから追加してください。
             </p>
           ) : (
             locations.map((l) => (
@@ -186,7 +191,7 @@ export default function LocationsPage() {
                       <input
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
-                        aria-label="卸先名"
+                        aria-label="お店名"
                         className="h-10 flex-1 rounded-md border border-border bg-surface px-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                       />
                       <input
@@ -261,7 +266,7 @@ export default function LocationsPage() {
                   <div className="border-t border-border bg-muted-bg/40 px-4 py-3">
                     <div className="mb-2 flex items-center justify-between">
                       <p className="text-sm font-semibold text-muted">
-                        {l.name} が扱う商品を選ぶ（チェックを外すと納品入力・予測から除外）
+                        {l.name} が扱う商品を選ぶ（チェックを外すと納品の記録・予測から除外）
                       </p>
                       <button
                         onClick={() => setAllProducts(l)}
@@ -271,7 +276,7 @@ export default function LocationsPage() {
                       </button>
                     </div>
 
-                    {/* 卸先の発注設定（ケース単位・既定安全率） */}
+                    {/* お店の発注設定（ケース単位・既定安全率） */}
                     <div className="mb-3 flex flex-wrap items-center gap-4 rounded-md border border-border bg-surface px-3 py-2">
                       <label className="flex items-center gap-2 text-base">
                         <input
@@ -280,16 +285,16 @@ export default function LocationsPage() {
                           onChange={() => update(l.id, { orderByCase: !l.orderByCase })}
                           className="h-5 w-5"
                         />
-                        ケース単位で卸す（推奨数をケースの倍数へ切り上げ）
+                        ケース単位で卸す（作る数をケースの倍数へ切り上げ）
                       </label>
                       <label className="flex items-center gap-1.5 text-base">
-                        この卸先の安全率
+                        このお店のゆとり（多めに作る割合）
                         <input
                           inputMode="numeric"
                           value={locSafetyPct(l)}
                           onChange={(e) => setLocSafety(l, e.target.value.replace(/[^0-9]/g, ''))}
                           placeholder="10"
-                          aria-label={`${l.name} の既定安全率（％）`}
+                          aria-label={`${l.name} のゆとり（％）`}
                           className="h-9 w-16 rounded-md border border-border bg-surface px-2 text-right text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                         />
                         <span className="text-muted">％（未入力=既定10％）</span>
@@ -299,7 +304,7 @@ export default function LocationsPage() {
                     {prods.length === 0 ? (
                       <p className="text-sm text-muted">
                         商品が登録されていません。
-                        <Link href="/products" className="text-primary hover:underline">商品管理</Link>
+                        <Link href="/products" className="text-primary hover:underline">設定 → 商品</Link>
                         から追加してください。
                       </p>
                     ) : (
@@ -328,13 +333,13 @@ export default function LocationsPage() {
                               </label>
                               {on ? (
                                 <label className="flex items-center gap-1 text-sm text-muted">
-                                  安全率
+                                  ゆとり
                                   <input
                                     inputMode="numeric"
                                     value={pairSafetyPct(l, p.id)}
                                     onChange={(e) => setPairSafety(l, p.id, e.target.value.replace(/[^0-9]/g, ''))}
                                     placeholder={locSafetyPct(l) || '10'}
-                                    aria-label={`${l.name} の ${p.name} の安全率（％）`}
+                                    aria-label={`${l.name} の ${p.name} のゆとり（％）`}
                                     className="h-9 w-14 rounded-md border border-border bg-surface px-2 text-right text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                                   />
                                   ％
@@ -356,8 +361,8 @@ export default function LocationsPage() {
       <p className="flex items-start gap-1.5 text-sm text-muted">
         <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
         <span>
-          新しく追加した卸先は過去の納品実績が無いため、予測は当面「参考値」（信頼度低め）になります。
-          納品入力でデータが貯まるほど予測精度が上がります。デモではこの登録内容はこのブラウザに保存されます。
+          新しく追加したお店は過去の納品実績が無いため、予測は当面「参考値」（信頼度低め）になります。
+          納品の記録でデータが貯まるほど見込みがよく当たるようになります。デモではこの登録内容はこのブラウザに保存されます。
         </span>
       </p>
     </div>

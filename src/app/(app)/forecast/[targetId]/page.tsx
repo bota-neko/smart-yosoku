@@ -41,7 +41,7 @@ import {
 
 /**
  * 予測詳細ページ（クライアント）。
- * seed 履歴を持つ既定の卸先はその履歴で、マスタ登録された新規卸先は
+ * seed 履歴を持つ既定のお店はその履歴で、マスタ登録された新規お店は
  * 履歴なし＝参考値として計算する。最上部に「明日の推奨数」を濃い赤・特大で表示。
  */
 export default function ForecastDetailPage() {
@@ -61,7 +61,7 @@ export default function ForecastDetailPage() {
   const productName = seedEntry?.productName ?? product?.name;
   const unit = seedEntry?.unit ?? product?.unit ?? '';
   const locationName =
-    location?.name ?? seedEntry?.location.name ?? locId ?? '不明な卸先';
+    location?.name ?? seedEntry?.location.name ?? locId ?? '不明なお店';
 
   // 商品が特定できない targetId は不正
   if (!productName) {
@@ -111,15 +111,15 @@ export default function ForecastDetailPage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/summary" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
+        <Link href="/dashboard" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          製造計画へ戻る
+          あした作る数へ戻る
         </Link>
       </div>
 
       <header className="space-y-1">
         <p className="text-muted">
-          卸先: {locationName}
+          お店: {locationName}
           {location?.kind ? `（${location.kind}）` : ''}
         </p>
         <h1 className="text-2xl font-bold">{productName}</h1>
@@ -133,11 +133,11 @@ export default function ForecastDetailPage() {
         <CardContent className="p-6">
           <div className="flex items-center gap-2 text-recommend">
             <ClipboardCheck className="h-6 w-6" aria-hidden="true" />
-            <span className="text-lg font-semibold">この卸先へ卸す推奨数</span>
+            <span className="text-lg font-semibold">このお店へ卸す数</span>
           </div>
           <p
             className="tabular mt-2 text-6xl font-extrabold leading-none text-recommend"
-            aria-label={`推奨数は${num(shipment.shipUnits)}${unit}です`}
+            aria-label={`卸す数は${num(shipment.shipUnits)}${unit}です`}
           >
             {num(shipment.shipUnits)}
             <span className="ml-2 text-2xl font-bold text-foreground">{unit}</span>

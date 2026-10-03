@@ -123,11 +123,11 @@ export async function POST(req: Request) {
       if (path === 'image' || path === 'mediaType') {
         return error(400, '画像を送れませんでした。別の写真でお試しください。');
       }
-      return error(400, '商品・卸先の登録内容を読み込めませんでした。ページを再読み込みしてお試しください。');
+      return error(400, '商品・お店の登録内容を読み込めませんでした。ページを再読み込みしてお試しください。');
     }
     body = parsed.data;
     if (body.products.length === 0) {
-      return error(400, '先に「商品管理」で商品を登録してください（納品書の品名と照らし合わせるため）。');
+      return error(400, '先に「設定」→「商品」で商品を登録してください（納品書の品名と照らし合わせるため）。');
     }
   } catch {
     return error(400, '画像のサイズが大きすぎるか、送信内容が正しくありません。');

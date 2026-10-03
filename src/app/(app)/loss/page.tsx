@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Trash2, TrendingDown, Coins, ArrowDownRight, Info } from 'lucide-react';
+import Link from 'next/link';
+import { Trash2, TrendingDown, Coins, ArrowDownRight, Info, ArrowLeft } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -45,11 +46,15 @@ export default function LossPage() {
 
   return (
     <div className="space-y-6">
+      <Link href="/review" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+        ふりかえりへ戻る
+      </Link>
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold">ロス・効果の見える化</h1>
+          <h1 className="text-2xl font-bold">ロスの内訳</h1>
           <p className="text-muted">
-            廃棄・売り切れ（機会損失）・粗利を金額で確認できます。納品入力で「廃棄」「売り切れ」を記録するほど正確になります。
+            廃棄・売り切れ（売り逃し）・粗利を金額で確認できます。納品のときに「廃棄」「売り切れ」を記録するほど正確になります。
           </p>
         </div>
         <div className="inline-flex rounded-md border border-border bg-surface p-0.5">
@@ -79,7 +84,7 @@ export default function LossPage() {
         <MoneyCard
           icon={<TrendingDown className="h-5 w-5" aria-hidden="true" />}
           tone="warn"
-          label="機会損失（推定）"
+          label="売り逃し（推定）"
           value={yen(summary.totalLostYen)}
           sub={`売り切れ ${formatNumber(summary.totalSoldOutDays)}回`}
         />
@@ -111,7 +116,7 @@ export default function LossPage() {
         <CardContent className="p-0">
           {summary.byProduct.length === 0 ? (
             <p className="p-8 text-center text-muted">
-              対象データがありません。納品入力で納品数・廃棄を記録すると集計されます。
+              まだ記録がありません。納品のときに数と廃棄を記録すると集計されます。
             </p>
           ) : (
             <div className="w-full overflow-x-auto">
@@ -157,8 +162,7 @@ export default function LossPage() {
       <p className="flex items-start gap-1.5 text-sm text-muted">
         <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
         <span>
-          金額は商品の「単価・原価」（商品管理で設定）から計算します。廃棄ロス＝廃棄数×原価、粗利＝（納品−廃棄）×（単価−原価）、機会損失＝売り切れ日の推定不足×粗利（推定）。
-          お試しモードでは見本の廃棄データが入っています。
+          金額は「設定」→「商品」の単価・原価から計算します。廃棄ロス＝廃棄数×原価、粗利＝（納品−廃棄）×（単価−原価）、売り逃し＝売り切れ日の推定不足×粗利（推定）。
         </span>
       </p>
     </div>

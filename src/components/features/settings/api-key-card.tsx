@@ -61,7 +61,7 @@ export function ApiKeyCard() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <KeyRound className="h-5 w-5 text-primary" aria-hidden="true" />
-          Claude APIキー（納品書の読み取り用）
+          Claude APIキー
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">

@@ -1,18 +1,18 @@
 'use client';
 
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
-  CalendarDays,
   Copy,
   CopyCheck,
   Check,
-  Circle,
   Save,
   Store,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Plus,
+  X,
 } from 'lucide-react';
 import {
   Card,
@@ -21,31 +21,26 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { getToday } from '@/lib/sample-data';
 import { useLocations, activeLocations, handlesProduct, type WholesaleDest } from '@/lib/locations-store';
 import { useProducts, activeProducts, type Product } from '@/lib/products-store';
 import { useDeliveries } from '@/lib/deliveries-store';
-import { useFactors, WEATHER_LABELS, type Weather, type DayFactor } from '@/lib/factors-store';
+import { useFactors, type DayFactor } from '@/lib/factors-store';
 import { useLosses } from '@/lib/losses-store';
-import { AutoFactorFetch } from '@/components/features/factors/auto-factor-fetch';
 import { SlipScanner, type SlipApply } from '@/components/features/slip/slip-scanner';
 import { addDays, dowLabel } from '@/domain';
 
 /**
- * 納品入力（卸先ごとに、何を何個納品したかを入力する）。
+ * きょうの納品。
  *
  * 流れ:
- *   1. 日付を選ぶ（前日/翌日・今日ボタン）
- *   2. 卸先（お店）を選ぶ（上部のタブ）
- *   3. 商品ごとに納品した個数を入力する（大きな入力欄）
+ *   1. 「納品書を撮る」→ 読み取り結果を確認 → 入力欄に下書き → 保存
+ *   2. 手で入れるときは、お店を選んで商品ごとの数を入力 → 保存
  *
- * - 「前日をコピー」「前週同曜日をコピー」で、その卸先の過去実績を一括入力
- * - 0 と空欄を区別（空欄=未入力=null, 0=納品ゼロ）
- * - 卸先ごとに入力状況（未入力/入力済み）を表示
- * - スマホ対応（1列の縦並び）
- *
- * 保存はローカル state のみ（Supabase 連携は別担当）。
+ * - お店ごとに「記録済み / まだ」を一覧で表示
+ * - 廃棄・売り切れ（ロス）と、特売・イベントなどは、ふだんは閉じておく
+ * - 天気・気温・祝日は自動取得（入力不要）
+ * - 0 と空欄を区別（空欄=未入力、0=納品ゼロ）
  */
 export default function DeliveryInputPage() {
   const { locations: allLocs } = useLocations();
@@ -65,11 +60,18 @@ export default function DeliveryInputPage() {
   const [pendingScan, setPendingScan] = useState<SlipApply | null>(null);
   const [scanNotice, setScanNotice] = useState<string | null>(null);
 
-  // 選択中の卸先が無効/未選択なら先頭へ寄せる
+  // お店を選んだら入力欄までスクロール（スマホで一覧の下に隠れないように）
+  const formRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (locs.length > 0 && !locs.some((l) => l.id === locationId)) {
-      setLocationId(locs[0].id);
-    }
+    if (locationId) formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [locationId]);
+
+  // ロス（廃棄・売切）の入力欄を出すか
+  const [showLoss, setShowLoss] = useState(false);
+
+  // 選択中のお店が削除・休止されたら選択を外す
+  useEffect(() => {
+    if (locationId && !locs.some((l) => l.id === locationId)) setLocationId('');
   }, [locs, locationId]);
 
   const key = (loc: string, prod: string) => `${loc}|${prod}`;
@@ -168,14 +170,6 @@ export default function DeliveryInputPage() {
     return { filled, total: list.length };
   };
 
-  const currentStatus = location ? locationStatus(location) : { filled: 0, total: 0 };
-  const dateLabel = `${date}（${dowLabel(date)}）`;
-
-  // その日の外部要因（天候・特売・イベント等）。予測に反映される。
-  const factor = getFactors(date);
-  const updateFactor = (patch: Partial<DayFactor>) =>
-    saveFactors(date, { ...getFactors(date), ...patch });
-
   /** 現在の日付・卸先の入力を納品実績ストアへ保存（'' は未入力=削除）。予測へ即反映。 */
   const handleSave = () => {
     if (!location) return;
@@ -190,30 +184,27 @@ export default function DeliveryInputPage() {
     );
   };
 
-  return (
-    <div className="space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold">納品入力</h1>
-        <p className="text-muted">
-          日付と卸先（お店）を選び、商品ごとに納品した個数を入力します。ここで入力した数字が「過去の納品実績」となり、予測の学習に使われます。空欄は「未入力」、0 は「納品ゼロ」として区別されます。
-        </p>
-      </header>
+  const isToday = date === getToday();
+  const recordedCount = locs.filter((l) => {
+    const st = locationStatus(l);
+    return st.total > 0 && st.filled === st.total;
+  }).length;
+  const [, mm, dd] = date.split('-').map(Number);
+  const nextDate = addDays(date, 1);
+  const hasLossToday = currentProducts.some((p) => {
+    const l = getLoss(date, locationId, p.id);
+    return l.waste != null || l.soldOut;
+  });
+  const lossOpen = showLoss || hasLossToday;
 
-      {/* 1. 日付選択 */}
-      <Card>
-        <CardContent className="flex flex-wrap items-center gap-3 p-4">
-          <span className="inline-flex items-center gap-2 text-sm font-semibold text-muted">
-            <CalendarDays className="h-5 w-5 text-primary" aria-hidden="true" />
-            日付
-          </span>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setDate(addDays(date, -1))}
-            aria-label="前日へ"
-          >
+  return (
+    <div className="space-y-5">
+      <header className="space-y-2">
+        <h1 className="text-2xl font-bold">{isToday ? 'きょうの納品' : `${mm}月${dd}日の納品`}</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="ghost" onClick={() => setDate(addDays(date, -1))} aria-label="前の日へ">
             <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-            前日
+            前の日
           </Button>
           <input
             type="date"
@@ -223,25 +214,26 @@ export default function DeliveryInputPage() {
               setSavedAt(null);
             }}
             aria-label="納品日"
-            className="h-11 rounded-md border border-border bg-surface px-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="h-10 rounded-md border border-border bg-surface px-2 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           />
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setDate(addDays(date, 1))}
-            aria-label="翌日へ"
-          >
-            翌日
+          <Button size="sm" variant="ghost" onClick={() => setDate(addDays(date, 1))} aria-label="次の日へ">
+            次の日
             <ChevronRight className="h-4 w-4" aria-hidden="true" />
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setDate(getToday())}>
-            今日
-          </Button>
-          <span className="ml-auto text-base font-medium">{dateLabel}</span>
-        </CardContent>
-      </Card>
+          {!isToday ? (
+            <Button size="sm" variant="outline" onClick={() => setDate(getToday())}>
+              きょうに戻る
+            </Button>
+          ) : null}
+          {locs.length > 0 ? (
+            <span className="ml-auto text-base text-muted">
+              記録済み {recordedCount} / {locs.length} 店
+            </span>
+          ) : null}
+        </div>
+      </header>
 
-      {/* 1.2 納品書の撮影・アップロードで自動入力 */}
+      {/* 1. 納品書を撮る（いちばん簡単な記録方法） */}
       <SlipScanner
         products={prods}
         locations={locs}
@@ -259,281 +251,229 @@ export default function DeliveryInputPage() {
         </p>
       ) : null}
 
-      {/* 1.5 その日の状況（外部要因）— 予測に反映 */}
-      <Card>
-        <CardContent className="space-y-3 p-4">
-          <p className="text-sm font-semibold text-muted">
-            その日の状況（特売・イベント・天気など・予測に反映されます）
-          </p>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-            {/* 天気 */}
-            <label className="flex items-center gap-2 text-base">
-              天気
-              <select
-                value={factor.weather ?? ''}
-                onChange={(e) =>
-                  updateFactor({ weather: (e.target.value || null) as Weather | null })
-                }
-                aria-label="天気"
-                className="h-10 rounded-md border border-border bg-surface px-2 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                <option value="">未設定</option>
-                {(Object.keys(WEATHER_LABELS) as Weather[]).map((w) => (
-                  <option key={w} value={w}>
-                    {WEATHER_LABELS[w]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {/* 最高気温 */}
-            <label className="flex items-center gap-1.5 text-base">
-              最高気温
-              <input
-                inputMode="numeric"
-                value={factor.tempHigh ?? ''}
-                onChange={(e) => {
-                  const v = e.target.value.replace(/[^0-9-]/g, '');
-                  updateFactor({ tempHigh: v === '' ? null : Number(v) });
-                }}
-                aria-label="最高気温（℃）"
-                placeholder="—"
-                className="h-10 w-16 rounded-md border border-border bg-surface px-2 text-right text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              />
-              ℃
-            </label>
-            {/* トグル群 */}
-            <FactorToggle label="特売" active={!!factor.sale} onToggle={() => updateFactor({ sale: !factor.sale })} />
-            <FactorToggle label="キャンペーン" active={!!factor.campaign} onToggle={() => updateFactor({ campaign: !factor.campaign })} />
-            <FactorToggle label="イベント" active={!!factor.event} onToggle={() => updateFactor({ event: !factor.event })} />
-            <FactorToggle label="祝日" active={!!factor.isHoliday} onToggle={() => updateFactor({ isHoliday: !factor.isHoliday })} />
-            <FactorToggle label="店休日" active={!!factor.closed} onToggle={() => updateFactor({ closed: !factor.closed })} />
-          </div>
-          <p className="text-xs text-muted">
-            明日など未来の日付に「特売」「雨」などを設定すると、その日の予測（製造計画）に補正がかかります。
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* 1.6 天気・祝日の自動取得 */}
-      <AutoFactorFetch />
-
-      {/* 2. 卸先選択（タブ） */}
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-sm font-semibold text-muted">卸先（お店）を選ぶ</p>
-          <Link
-            href="/locations"
-            className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            卸先を追加・管理
-          </Link>
-        </div>
+      {/* 2. お店を選んで手で入力 */}
+      <section className="space-y-2" aria-label="お店を選んで手で入力">
+        <p className="text-sm font-semibold text-muted">または、お店を選んで手で入力</p>
         {locs.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center gap-3 p-8 text-center">
               <Store className="h-8 w-8 text-muted" aria-hidden="true" />
-              <p className="text-muted">卸先がまだ登録されていません。</p>
+              <p className="text-muted">お店がまだ登録されていません。</p>
               <Link href="/locations">
                 <Button>
                   <Plus className="h-5 w-5" aria-hidden="true" />
-                  卸先を登録する
+                  お店を登録する
                 </Button>
               </Link>
             </CardContent>
           </Card>
         ) : (
-        <div
-          role="tablist"
-          aria-label="卸先の選択"
-          className="flex flex-wrap gap-2"
-        >
-          {locs.map((loc) => {
-            const st = locationStatus(loc);
-            const done = st.total > 0 && st.filled === st.total;
-            const active = loc.id === locationId;
-            return (
-              <button
-                key={loc.id}
-                role="tab"
-                aria-selected={active}
-                onClick={() => setLocationId(loc.id)}
-                className={`inline-flex min-h-11 items-center gap-2 rounded-md border px-3 text-base transition-colors ${
-                  active
-                    ? 'border-primary bg-primary text-primary-fg'
-                    : 'border-border bg-surface text-foreground hover:bg-muted-bg'
-                }`}
-              >
-                <Store className="h-4 w-4" aria-hidden="true" />
-                <span>{loc.name}</span>
-                {done ? (
-                  <Check
-                    className={`h-4 w-4 ${active ? 'text-primary-fg' : 'text-state-good'}`}
-                    aria-label="入力済み"
-                  />
-                ) : (
-                  <span
-                    className={`rounded-full px-1.5 text-xs ${
-                      active ? 'bg-primary-fg/20' : 'bg-muted-bg text-muted'
-                    }`}
-                    aria-label={`未入力 ${st.total - st.filled} 件`}
-                  >
-                    {st.filled}/{st.total}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-        )}
-      </div>
-
-      {/* 3. 商品ごとの納品数入力 */}
-      <Card>
-        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
-          <CardTitle className="flex items-center gap-2">
-            <Store className="h-5 w-5 text-primary" aria-hidden="true" />
-            {location?.name}
-            {location?.kind ? (
-              <span className="text-base font-normal text-muted">（{location.kind}）</span>
-            ) : null}
-            <span className="text-base font-normal text-muted">への納品</span>
-          </CardTitle>
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => copyFrom(addDays(date, -1))}>
-              <Copy className="h-4 w-4" aria-hidden="true" />
-              前日をコピー
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => copyFrom(addDays(date, -7))}>
-              <Copy className="h-4 w-4" aria-hidden="true" />
-              前週同曜日をコピー
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="divide-y divide-border p-0">
-          {currentProducts.length === 0 ? (
-            <p className="p-6 text-center text-muted">
-              この卸先が扱う商品がありません。「卸先管理」の取扱商品、または「商品管理」で設定してください。
-            </p>
-          ) : null}
-          {currentProducts.map((product, i) => {
-            const k = key(locationId, product.id);
-            const val = values[k] ?? '';
-            const empty = val === '';
-            const ref = references.find((r) => r.product.id === product.id)?.reference ?? null;
-            return (
-              <div
-                key={product.id}
-                className="flex flex-wrap items-center gap-3 px-4 py-3"
-              >
-                <label htmlFor={`prod-${product.id}`} className="min-w-[8rem] flex-1 text-lg font-medium">
-                  {product.name}
-                </label>
-                {ref !== null ? (
-                  <span className="text-sm text-muted">
-                    前回 {ref}
-                    {product.unit}
-                  </span>
-                ) : null}
-                <div className="flex items-center gap-2">
-                  <input
-                    id={`prod-${product.id}`}
-                    type="text"
-                    inputMode={product.allowDecimal ? 'decimal' : 'numeric'}
-                    value={val}
-                    onChange={(e) => setValue(product.id, e.target.value, product.allowDecimal)}
-                    onFocus={(e) => e.currentTarget.select()}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        const next = currentProducts[i + 1];
-                        if (next) document.getElementById(`prod-${next.id}`)?.focus();
-                      }
-                    }}
-                    placeholder="未入力"
-                    aria-label={`${location?.name} へ納品した ${product.name} の数（${product.unit}）`}
-                    className={`h-12 w-28 rounded-md border px-3 text-right text-xl tabular focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                      empty
-                        ? 'border-dashed border-border bg-muted-bg/40 text-muted placeholder:text-muted'
-                        : 'border-border bg-surface text-foreground'
-                    }`}
-                  />
-                  <span className="w-10 text-base text-muted">{product.unit}</span>
-                </div>
-
-                {/* 任意: 廃棄・売り切れ（ロス分析用） */}
-                <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-1 text-sm text-muted" title="廃棄・返品数（任意）">
-                    廃棄
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={getLoss(date, locationId, product.id).waste ?? ''}
-                      onChange={(e) => {
-                        const v = e.target.value.replace(/[^0-9]/g, '');
-                        setLoss(date, locationId, product.id, { waste: v === '' ? undefined : Number(v) });
-                      }}
-                      aria-label={`${product.name} の廃棄・返品数（任意）`}
-                      placeholder="—"
-                      className="h-9 w-14 rounded-md border border-border bg-surface px-2 text-right text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    />
-                  </label>
+          <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
+            {locs.map((loc) => {
+              const st = locationStatus(loc);
+              const done = st.total > 0 && st.filled === st.total;
+              const active = loc.id === locationId;
+              return (
+                <li key={loc.id}>
                   <button
                     type="button"
-                    onClick={() =>
-                      setLoss(date, locationId, product.id, {
-                        soldOut: !getLoss(date, locationId, product.id).soldOut,
-                      })
-                    }
-                    aria-pressed={getLoss(date, locationId, product.id).soldOut}
-                    title="売り切れ（もっと売れたはず）"
-                    className={`min-h-9 rounded-md border px-2 text-sm ${
-                      getLoss(date, locationId, product.id).soldOut
-                        ? 'border-state-warn bg-state-warn/10 text-state-warn'
-                        : 'border-dashed border-border text-muted hover:bg-muted-bg'
+                    onClick={() => setLocationId(active ? '' : loc.id)}
+                    aria-expanded={active}
+                    className={`flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left text-lg transition-colors ${
+                      active ? 'bg-primary/10' : 'hover:bg-muted-bg'
                     }`}
                   >
-                    売切
+                    <span className="inline-flex items-center gap-2">
+                      <Store className="h-5 w-5 text-muted" aria-hidden="true" />
+                      {loc.name}
+                    </span>
+                    {done ? (
+                      <span className="inline-flex items-center gap-1 text-base text-state-good">
+                        <Check className="h-5 w-5" aria-hidden="true" />
+                        記録済み
+                      </span>
+                    ) : (
+                      <span className="text-base text-state-warn">
+                        {st.filled > 0 ? `${st.filled} / ${st.total}` : 'まだ'}
+                      </span>
+                    )}
                   </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      {/* 3. 選んだお店の入力欄 */}
+      {location ? (
+        <div ref={formRef} className="scroll-mt-20">
+        <Card>
+          <CardHeader className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="flex items-center gap-2">
+                <Store className="h-5 w-5 text-primary" aria-hidden="true" />
+                {location.name}
+                <span className="text-base font-normal text-muted">への納品</span>
+              </CardTitle>
+              <Button size="icon" variant="ghost" onClick={() => setLocationId('')} aria-label="入力欄を閉じる">
+                <X className="h-5 w-5" aria-hidden="true" />
+              </Button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => copyFrom(addDays(date, -1))}>
+                <Copy className="h-4 w-4" aria-hidden="true" />
+                前の日と同じ
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => copyFrom(addDays(date, -7))}>
+                <Copy className="h-4 w-4" aria-hidden="true" />
+                先週と同じ
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="divide-y divide-border p-0">
+            {currentProducts.length === 0 ? (
+              <p className="p-6 text-center text-muted">
+                このお店が扱う商品がありません。「設定」→「お店」で取扱商品を選んでください。
+              </p>
+            ) : null}
+            {currentProducts.map((product, i) => {
+              const k = key(locationId, product.id);
+              const val = values[k] ?? '';
+              const empty = val === '';
+              const ref = references.find((r) => r.product.id === product.id)?.reference ?? null;
+              const loss = getLoss(date, locationId, product.id);
+              return (
+                <div key={product.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                  <label htmlFor={`prod-${product.id}`} className="min-w-[8rem] flex-1 text-lg font-medium">
+                    {product.name}
+                    {ref !== null ? (
+                      <span className="block text-sm font-normal text-muted">
+                        前の日 {ref}
+                        {product.unit}
+                      </span>
+                    ) : null}
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id={`prod-${product.id}`}
+                      type="text"
+                      inputMode={product.allowDecimal ? 'decimal' : 'numeric'}
+                      value={val}
+                      onChange={(e) => setValue(product.id, e.target.value, product.allowDecimal)}
+                      onFocus={(e) => e.currentTarget.select()}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const next = currentProducts[i + 1];
+                          if (next) document.getElementById(`prod-${next.id}`)?.focus();
+                        }
+                      }}
+                      placeholder="未入力"
+                      aria-label={`${location.name} へ納品した ${product.name} の数（${product.unit}）`}
+                      className={`h-12 w-28 rounded-md border px-3 text-right text-xl tabular focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                        empty
+                          ? 'border-dashed border-border bg-muted-bg/40 text-muted placeholder:text-muted'
+                          : 'border-border bg-surface text-foreground'
+                      }`}
+                    />
+                    <span className="w-12 text-base text-muted">{product.unit}</span>
+                  </div>
+
+                  {lossOpen ? (
+                    <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+                      <label className="flex items-center gap-1 text-sm text-muted">
+                        廃棄
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={loss.waste ?? ''}
+                          onChange={(e) => {
+                            const v = e.target.value.replace(/[^0-9]/g, '');
+                            setLoss(date, locationId, product.id, { waste: v === '' ? undefined : Number(v) });
+                          }}
+                          aria-label={`${product.name} の廃棄・返品数`}
+                          placeholder="—"
+                          className="h-10 w-16 rounded-md border border-border bg-surface px-2 text-right text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setLoss(date, locationId, product.id, { soldOut: !loss.soldOut })}
+                        aria-pressed={!!loss.soldOut}
+                        className={`min-h-10 rounded-md border px-3 text-sm ${
+                          loss.soldOut
+                            ? 'border-state-warn bg-state-warn/10 text-state-warn'
+                            : 'border-dashed border-border text-muted hover:bg-muted-bg'
+                        }`}
+                      >
+                        {loss.soldOut ? '✓ ' : ''}売り切れ
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+            {currentProducts.length > 0 && !lossOpen ? (
+              <div className="px-4 py-2">
+                <button
+                  type="button"
+                  onClick={() => setShowLoss(true)}
+                  className="inline-flex min-h-10 items-center gap-1 text-sm text-primary hover:underline"
+                >
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  廃棄・売り切れも記録する（ふりかえり用・任意）
+                </button>
+              </div>
+            ) : null}
+            <div className="flex flex-wrap items-center justify-end gap-3 px-4 py-3">
+              {savedAt ? (
+                <span className="inline-flex items-center gap-1 text-sm text-state-good" role="status">
+                  <CopyCheck className="h-4 w-4" aria-hidden="true" />
+                  {savedAt} に保存しました
+                </span>
+              ) : null}
+              <Button onClick={handleSave} disabled={currentProducts.length === 0}>
+                <Save className="h-5 w-5" aria-hidden="true" />
+                保存する
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+        </div>
+      ) : null}
+
+      {/* 4. 特売・イベントなど（ふだんは閉じておく） */}
+      <details className="group rounded-lg border border-border bg-surface">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 px-4 text-base text-muted [&::-webkit-details-marker]:hidden">
+          <ChevronDown className="h-5 w-5 transition-transform group-open:rotate-180" aria-hidden="true" />
+          特売・イベント・店休日など
+        </summary>
+        <div className="space-y-4 border-t border-border px-4 py-4">
+          {[date, nextDate].map((d) => {
+            const f = getFactors(d);
+            const [, m2, d2] = d.split('-').map(Number);
+            const patch = (p: Partial<DayFactor>) => saveFactors(d, { ...getFactors(d), ...p });
+            return (
+              <div key={d} className="space-y-2">
+                <p className="text-base font-medium">
+                  {m2}月{d2}日（{dowLabel(d)}）{d === nextDate ? 'の予定' : ''}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <FactorToggle label="特売" active={!!f.sale} onToggle={() => patch({ sale: !f.sale })} />
+                  <FactorToggle label="キャンペーン" active={!!f.campaign} onToggle={() => patch({ campaign: !f.campaign })} />
+                  <FactorToggle label="イベント" active={!!f.event} onToggle={() => patch({ event: !f.event })} />
+                  <FactorToggle label="祝日" active={!!f.isHoliday} onToggle={() => patch({ isHoliday: !f.isHoliday })} />
+                  <FactorToggle label="店休日" active={!!f.closed} onToggle={() => patch({ closed: !f.closed })} />
                 </div>
               </div>
             );
           })}
-        </CardContent>
-      </Card>
-
-      {/* 保存バー */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="text-base">
-          {currentStatus.total === 0 ? null : currentStatus.filled === currentStatus.total ? (
-            <Badge variant="good">
-              <Check className="h-4 w-4" aria-hidden="true" />
-              {location?.name} は入力済み
-            </Badge>
-          ) : (
-            <Badge variant="warn">
-              <Circle className="h-3 w-3" aria-hidden="true" />
-              {location?.name} は未入力 {currentStatus.total - currentStatus.filled} 件
-            </Badge>
-          )}
+          <p className="text-sm text-muted">
+            印をつけた日は、作る数の見込みに反映されます。天気・気温・祝日は自動で取得しています。
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          {savedAt ? (
-            <span className="inline-flex items-center gap-1 text-sm text-state-good">
-              <CopyCheck className="h-4 w-4" aria-hidden="true" />
-              {savedAt} に保存しました（予測へ反映）
-            </span>
-          ) : null}
-          <Button onClick={handleSave}>
-            <Save className="h-5 w-5" aria-hidden="true" />
-            この日の納品を保存
-          </Button>
-        </div>
-      </div>
-
-      <p className="text-sm text-muted">
-        Enter キーで次の商品へ移動できます。卸先を切り替えても入力内容は保持されます。
-      </p>
+      </details>
     </div>
   );
 }
