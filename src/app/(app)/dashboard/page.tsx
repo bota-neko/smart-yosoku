@@ -59,6 +59,7 @@ export default function PlanPage() {
     : locs.filter(
         (l) =>
           !isRestDay(restMap, today, l.id) &&
+          prods.some((p) => handlesProduct(l, p.id)) &&
           !prods.some((p) => handlesProduct(l, p.id) && map[`${today}|${l.id}|${p.id}`] != null),
       ).length;
 

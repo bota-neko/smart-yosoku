@@ -133,3 +133,8 @@ export function useFactors() {
 export function resetFactorsDemo(): void {
   write({});
 }
+
+/** 現在の外部要因を読む（フック外から）。 */
+export function readFactorMap(): FactorMap {
+  return read();
+}

@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useFactors } from '@/lib/factors-store';
+import { useFactors, readFactorMap } from '@/lib/factors-store';
 import { readSettings } from '@/lib/settings-store';
 import { fetchFactorUpdates } from '@/lib/factor-sync';
-import { getToday } from '@/lib/sample-data';
+import { getToday, getTomorrow } from '@/lib/sample-data';
 
 /** その日に取得済みかの目印（端末ごと。クラウド保存はしない）。 */
 const FETCHED_KEY = 'smart-yosoku:weather-fetched-on';
@@ -22,7 +22,9 @@ export function AutoWeather() {
       const s = readSettings();
       const marker = `${getToday()}|${s.latitude},${s.longitude}`;
       try {
-        if (window.localStorage.getItem(FETCHED_KEY) === marker) return;
+        // 取得済みでも、明日の天気が入っていなければ取り直す（ログイン時の読み込みで上書きされた場合など）
+        const hasTomorrow = !!readFactorMap()[getTomorrow()]?.weather;
+        if (window.localStorage.getItem(FETCHED_KEY) === marker && hasTomorrow) return;
       } catch {
         return;
       }

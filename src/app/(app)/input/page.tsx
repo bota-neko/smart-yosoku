@@ -86,17 +86,31 @@ export default function DeliveryInputPage() {
     [prods],
   );
 
-  // 日付・ストア内容が変わったら、その日付の実績を編集バッファへ読み込む
+  // 保存前の入力（キー `${locationId}|${productId}`）。別のお店を保存しても消さないために覚えておく
+  const dirty = useRef<Set<string>>(new Set());
+  const clearDirty = (locId: string) => {
+    for (const k of Array.from(dirty.current)) if (k.startsWith(`${locId}|`)) dirty.current.delete(k);
+  };
+
+  // 日付が変わったら、保存前の入力と保存メッセージをリセット
   useEffect(() => {
-    const buffer: Record<string, string> = {};
-    for (const loc of locs) {
-      for (const p of productsFor(loc)) {
-        const v = map[`${date}|${loc.id}|${p.id}`];
-        buffer[key(loc.id, p.id)] = v == null ? '' : String(v);
-      }
-    }
-    setValues(buffer);
+    dirty.current.clear();
     setSavedAt(null);
+  }, [date]);
+
+  // 日付・ストア内容が変わったら、その日付の実績を編集バッファへ読み込む（保存前の入力は残す）
+  useEffect(() => {
+    setValues((prev) => {
+      const buffer: Record<string, string> = {};
+      for (const loc of locs) {
+        for (const p of productsFor(loc)) {
+          const k = key(loc.id, p.id);
+          const v = map[`${date}|${loc.id}|${p.id}`];
+          buffer[k] = dirty.current.has(k) ? prev[k] ?? '' : v == null ? '' : String(v);
+        }
+      }
+      return buffer;
+    });
     // locs/prods は毎レンダー生成のため依存は date と map に限定（内容変化で再読込）
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, map]);
@@ -108,16 +122,19 @@ export default function DeliveryInputPage() {
     setValues((prev) => {
       const next = { ...prev };
       for (const [productId, qty] of Object.entries(scan.values)) {
-        next[key(scan.locationId, productId)] = String(qty);
+        const k = key(scan.locationId, productId);
+        next[k] = String(qty);
+        dirty.current.add(k);
       }
       return next;
     });
+    setRest(scan.date, scan.locationId, false);
     setLocationId(scan.locationId);
     setPendingScan(null);
     setSavedAt(null);
     const name = locs.find((l) => l.id === scan.locationId)?.name ?? '';
     setScanNotice(
-      `納品書から ${name} の ${Object.keys(scan.values).length} 品目を入力しました。内容を確認して「この日の納品を保存」を押してください。`,
+      `納品書から ${name} の ${Object.keys(scan.values).length} 品目を入力しました。内容を確認して「保存する」を押してください。`,
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingScan, date]);
@@ -144,6 +161,7 @@ export default function DeliveryInputPage() {
     const cleaned = allowDecimal
       ? raw.replace(/[^0-9.]/g, '')
       : raw.replace(/[^0-9]/g, '');
+    dirty.current.add(key(locationId, productId));
     setValues((prev) => ({ ...prev, [key(locationId, productId)]: cleaned }));
     setSavedAt(null);
   };
@@ -156,6 +174,7 @@ export default function DeliveryInputPage() {
         for (const p of currentProducts) {
           const v = map[`${sourceDate}|${locationId}|${p.id}`];
           next[key(locationId, p.id)] = v == null ? '' : String(v);
+          dirty.current.add(key(locationId, p.id));
         }
         return next;
       });
@@ -181,6 +200,7 @@ export default function DeliveryInputPage() {
       const raw = values[key(locationId, p.id)] ?? '';
       return { productId: p.id, value: raw === '' ? null : Number(raw) };
     });
+    clearDirty(locationId);
     saveValues(date, locationId, entries);
     if (entries.some((e) => e.value !== null)) setRest(date, locationId, false);
     setScanNotice(null);
@@ -195,6 +215,7 @@ export default function DeliveryInputPage() {
       for (const p of currentProducts) next[key(locationId, p.id)] = '0';
       return next;
     });
+    clearDirty(locationId);
     saveValues(date, locationId, currentProducts.map((p) => ({ productId: p.id, value: 0 })));
     setRest(date, locationId, false);
     setScanNotice(null);
@@ -209,6 +230,7 @@ export default function DeliveryInputPage() {
       for (const p of currentProducts) next[key(locationId, p.id)] = '';
       return next;
     });
+    clearDirty(locationId);
     saveValues(date, locationId, currentProducts.map((p) => ({ productId: p.id, value: null })));
     setRest(date, locationId, true);
     setScanNotice(null);
@@ -222,7 +244,8 @@ export default function DeliveryInputPage() {
   const recordedCount = locs.filter((l) => {
     if (isRest(l)) return true;
     const st = locationStatus(l);
-    return st.total > 0 && st.filled === st.total;
+    // 取扱商品が無いお店は記録不要
+    return st.total === 0 || st.filled === st.total;
   }).length;
   const currentRest = location ? isRest(location) : false;
   const [, mm, dd] = date.split('-').map(Number);
@@ -328,6 +351,8 @@ export default function DeliveryInputPage() {
                         <Moon className="h-5 w-5" aria-hidden="true" />
                         {shopClosed ? '店休日' : '休み'}
                       </span>
+                    ) : st.total === 0 ? (
+                      <span className="text-sm text-muted">取扱商品なし</span>
                     ) : done ? (
                       <span className="inline-flex items-center gap-1 text-base text-state-good">
                         <Check className="h-5 w-5" aria-hidden="true" />
