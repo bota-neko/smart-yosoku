@@ -16,6 +16,7 @@ import { useProducts, activeProducts } from '@/lib/products-store';
 import { useLocations, activeLocations, handlesProduct } from '@/lib/locations-store';
 import { useDeliveries, historyFromMap } from '@/lib/deliveries-store';
 import { useFactors, toDailyFactorsMap, WEATHER_LABELS } from '@/lib/factors-store';
+import { useRestDays, isRestDay } from '@/lib/rest-days-store';
 import { formatNumber } from '@/lib/utils';
 import { dowLabel } from '@/domain';
 
@@ -29,6 +30,7 @@ export default function PlanPage() {
   const { locations } = useLocations();
   const { map } = useDeliveries();
   const { map: factorMap, getFactors } = useFactors();
+  const { map: restMap } = useRestDays();
   const [view, setView] = useState<'tomorrow' | 'week'>('tomorrow');
 
   const today = getToday();
@@ -42,7 +44,8 @@ export default function PlanPage() {
     .map((p) =>
       computeProductSummaryFor(
         p,
-        locs.filter((l) => handlesProduct(l, p.id)),
+        // 明日「休み」のお店は作る数に含めない
+        locs.filter((l) => handlesProduct(l, p.id) && !isRestDay(restMap, tomorrow, l.id)),
         tomorrow,
         getHistory,
         factorsByDate[tomorrow],
@@ -50,10 +53,14 @@ export default function PlanPage() {
     )
     .filter((s) => s.stores.length > 0);
 
-  // きょうの納品がまだのお店
-  const notRecorded = locs.filter(
-    (l) => !prods.some((p) => handlesProduct(l, p.id) && map[`${today}|${l.id}|${p.id}`] != null),
-  ).length;
+  // きょうの納品がまだのお店（休み・店休日は除く）
+  const notRecorded = getFactors(today).closed
+    ? 0
+    : locs.filter(
+        (l) =>
+          !isRestDay(restMap, today, l.id) &&
+          !prods.some((p) => handlesProduct(l, p.id) && map[`${today}|${l.id}|${p.id}`] != null),
+      ).length;
 
   const f = getFactors(tomorrow);
   const dayNotes = [
@@ -134,11 +141,19 @@ export default function PlanPage() {
         <WeeklyTable days={7} />
       ) : (
         <>
-          <ul className="space-y-3">
-            {summaries.map((s) => (
-              <ProductRow key={s.product.id} summary={s} />
-            ))}
-          </ul>
+          {summaries.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center text-muted">
+                明日はすべてのお店が休み（または店休日）です。
+              </CardContent>
+            </Card>
+          ) : (
+            <ul className="space-y-3">
+              {summaries.map((s) => (
+                <ProductRow key={s.product.id} summary={s} />
+              ))}
+            </ul>
+          )}
           <p className="text-sm text-muted">
             天気・特売・祝日を反映し、売り切れないよう少し多めの数にしています。商品を押すとお店ごとの内訳が見られます。
           </p>

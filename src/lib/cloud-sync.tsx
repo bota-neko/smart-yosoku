@@ -20,6 +20,7 @@ const STORAGE_KEYS = [
   'smart-yosoku:factors:v1',
   'smart-yosoku:losses:v1',
   'smart-yosoku:settings:v1',
+  'smart-yosoku:rest-days:v1',
 ];
 
 /** 各ストアが発火する変更イベント。 */
@@ -30,6 +31,7 @@ const CHANGE_EVENTS = [
   'smart-yosoku:factors-changed',
   'smart-yosoku:losses-changed',
   'smart-yosoku:settings-changed',
+  'smart-yosoku:rest-days-changed',
 ];
 
 /** 現在の localStorage から state オブジェクトを組み立てる。 */
@@ -81,6 +83,7 @@ function initEmptyLocal(): void {
   window.localStorage.setItem('smart-yosoku:deliveries:v2', '{}');
   window.localStorage.setItem('smart-yosoku:factors:v1', '{}');
   window.localStorage.setItem('smart-yosoku:losses:v1', '{}');
+  window.localStorage.setItem('smart-yosoku:rest-days:v1', '{}');
   window.localStorage.removeItem('smart-yosoku:settings:v1'); // 地域は既定のまま
 }
 

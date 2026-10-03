@@ -13,6 +13,8 @@ import {
   ChevronDown,
   Plus,
   X,
+  Moon,
+  CircleSlash,
 } from 'lucide-react';
 import {
   Card,
@@ -27,6 +29,7 @@ import { useProducts, activeProducts, type Product } from '@/lib/products-store'
 import { useDeliveries } from '@/lib/deliveries-store';
 import { useFactors, type DayFactor } from '@/lib/factors-store';
 import { useLosses } from '@/lib/losses-store';
+import { useRestDays, isRestDay } from '@/lib/rest-days-store';
 import { SlipScanner, type SlipApply } from '@/components/features/slip/slip-scanner';
 import { addDays, dowLabel } from '@/domain';
 
@@ -48,6 +51,7 @@ export default function DeliveryInputPage() {
   const { map, saveValues } = useDeliveries();
   const { getFactors, saveFactors } = useFactors();
   const { getLoss, setLoss } = useLosses();
+  const { map: restMap, setRest } = useRestDays();
   const locs = activeLocations(allLocs);
   const prods = activeProducts(products);
   const [date, setDate] = useState<string>(getToday());
@@ -178,17 +182,49 @@ export default function DeliveryInputPage() {
       return { productId: p.id, value: raw === '' ? null : Number(raw) };
     });
     saveValues(date, locationId, entries);
+    if (entries.some((e) => e.value !== null)) setRest(date, locationId, false);
     setScanNotice(null);
-    setSavedAt(
-      new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
-    );
+    setSavedAt(`${nowLabel()} に保存しました`);
+  };
+
+  /** 納品なし：全商品を 0 で記録して保存（「売れなかった日」として見込みに使われる）。 */
+  const handleNoDelivery = () => {
+    if (!location) return;
+    setValues((prev) => {
+      const next = { ...prev };
+      for (const p of currentProducts) next[key(locationId, p.id)] = '0';
+      return next;
+    });
+    saveValues(date, locationId, currentProducts.map((p) => ({ productId: p.id, value: 0 })));
+    setRest(date, locationId, false);
+    setScanNotice(null);
+    setSavedAt(`${nowLabel()} に「納品なし（0）」で保存しました`);
+  };
+
+  /** 休み：記録を消して「休み」にする（見込みの計算では無視、未来の日なら作る数を0に）。 */
+  const handleRest = () => {
+    if (!location) return;
+    setValues((prev) => {
+      const next = { ...prev };
+      for (const p of currentProducts) next[key(locationId, p.id)] = '';
+      return next;
+    });
+    saveValues(date, locationId, currentProducts.map((p) => ({ productId: p.id, value: null })));
+    setRest(date, locationId, true);
+    setScanNotice(null);
+    setSavedAt(null);
   };
 
   const isToday = date === getToday();
+  /** 自店の店休日（その日の全お店が休み扱い） */
+  const shopClosed = !!getFactors(date).closed;
+  const isRest = (l: WholesaleDest) => shopClosed || isRestDay(restMap, date, l.id);
   const recordedCount = locs.filter((l) => {
+    if (isRest(l)) return true;
     const st = locationStatus(l);
     return st.total > 0 && st.filled === st.total;
   }).length;
+  const currentRest = location ? isRest(location) : false;
   const [, mm, dd] = date.split('-').map(Number);
   const nextDate = addDays(date, 1);
   const hasLossToday = currentProducts.some((p) => {
@@ -287,7 +323,12 @@ export default function DeliveryInputPage() {
                       <Store className="h-5 w-5 text-muted" aria-hidden="true" />
                       {loc.name}
                     </span>
-                    {done ? (
+                    {isRest(loc) ? (
+                      <span className="inline-flex items-center gap-1 text-base text-muted">
+                        <Moon className="h-5 w-5" aria-hidden="true" />
+                        {shopClosed ? '店休日' : '休み'}
+                      </span>
+                    ) : done ? (
                       <span className="inline-flex items-center gap-1 text-base text-state-good">
                         <Check className="h-5 w-5" aria-hidden="true" />
                         記録済み
@@ -320,7 +361,7 @@ export default function DeliveryInputPage() {
                 <X className="h-5 w-5" aria-hidden="true" />
               </Button>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className={`flex flex-wrap items-center gap-2 ${currentRest ? 'hidden' : ''}`}>
               <Button size="sm" variant="outline" onClick={() => copyFrom(addDays(date, -1))}>
                 <Copy className="h-4 w-4" aria-hidden="true" />
                 前の日と同じ
@@ -331,6 +372,21 @@ export default function DeliveryInputPage() {
               </Button>
             </div>
           </CardHeader>
+          {currentRest ? (
+            <CardContent className="space-y-3">
+              <p className="flex items-start gap-2 text-base">
+                <Moon className="mt-0.5 h-5 w-5 shrink-0 text-muted" aria-hidden="true" />
+                {shopClosed
+                  ? 'この日は店休日にしています。見込みの計算には使いません（「特売・イベント・店休日など」で外せます）。'
+                  : 'この日は「休み」にしています。記録はせず、見込みの計算にも使いません。'}
+              </p>
+              {!shopClosed ? (
+                <Button variant="outline" onClick={() => setRest(date, locationId, false)}>
+                  休みを取り消して入力する
+                </Button>
+              ) : null}
+            </CardContent>
+          ) : (
           <CardContent className="divide-y divide-border p-0">
             {currentProducts.length === 0 ? (
               <p className="p-6 text-center text-muted">
@@ -430,7 +486,7 @@ export default function DeliveryInputPage() {
               {savedAt ? (
                 <span className="inline-flex items-center gap-1 text-sm text-state-good" role="status">
                   <CopyCheck className="h-4 w-4" aria-hidden="true" />
-                  {savedAt} に保存しました
+                  {savedAt}
                 </span>
               ) : null}
               <Button onClick={handleSave} disabled={currentProducts.length === 0}>
@@ -438,7 +494,26 @@ export default function DeliveryInputPage() {
                 保存する
               </Button>
             </div>
+            {currentProducts.length > 0 ? (
+              <div className="space-y-2 bg-muted-bg/40 px-4 py-3">
+                <p className="text-sm text-muted">このお店に納品がなかった日は</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={handleNoDelivery}>
+                    <CircleSlash className="h-4 w-4" aria-hidden="true" />
+                    注文がなかった（全部0）
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={handleRest}>
+                    <Moon className="h-4 w-4" aria-hidden="true" />
+                    お店が休みだった（記録しない）
+                  </Button>
+                </div>
+                <p className="text-xs text-muted">
+                  「全部0」は売れなかった日として見込みに使います。臨時休業などは「休み」にすると、見込みの計算から外します。
+                </p>
+              </div>
+            ) : null}
           </CardContent>
+          )}
         </Card>
         </div>
       ) : null}
@@ -510,4 +585,9 @@ function FactorToggle({
       {label}
     </button>
   );
+}
+
+/** 保存時刻の表示用（例: 14:05）。 */
+function nowLabel(): string {
+  return new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
 }

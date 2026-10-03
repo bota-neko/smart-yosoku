@@ -11,6 +11,7 @@ import { resetDeliveriesDemo } from './deliveries-store';
 import { resetFactorsDemo } from './factors-store';
 import { resetLossesDemo } from './losses-store';
 import { resetSettingsDemo } from './settings-store';
+import { resetRestDaysDemo } from './rest-days-store';
 
 /** 全ストアをまとめて見本の初期状態へ戻す。 */
 export function resetAllDemoData(): void {
@@ -20,6 +21,7 @@ export function resetAllDemoData(): void {
   resetFactorsDemo();
   resetLossesDemo();
   resetSettingsDemo();
+  resetRestDaysDemo();
 }
 
 /** 旧バージョン（v1）の保存キー。現在は未使用のため自動削除する。 */

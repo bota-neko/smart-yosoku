@@ -6,9 +6,12 @@ import { addDays, diffDays, dayOfWeek, monthOf, sameDayLastYear, toEpoch } from 
  * 実績から「需要」の代理値を求める。
  * 売り切れ日は販売数が需要の上限を示さないため、欠品推定分を加える。
  * 欠品推定が無く soldOut のみの場合は控えめに10%上乗せ（説明可能な既定）。
+ * 店休日（factors.closed）の記録は需要を表さないため null（学習から除外）。
  */
 export function demandOf(r: DailyRecord): number | null {
   if (r.sales === null || r.sales === undefined) return null;
+  // 店休日は「売れなかった」のではないので、学習に使わない
+  if (r.factors?.closed) return null;
   let demand = r.sales;
   if (r.stockout && r.stockout > 0) {
     demand += r.stockout;

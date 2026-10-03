@@ -85,3 +85,24 @@ describe('forecast engine', () => {
     expect(r.rangeHigh).toBeGreaterThanOrEqual(r.adjustedDemand);
   });
 });
+
+describe('店休日の記録は学習に使わない', () => {
+  it('店休日に0を記録しても、見込みが下がらない', async () => {
+    const { demandOf } = await import('@/domain/forecast/features');
+    expect(demandOf({ date: '2026-10-01', sales: 0, factors: { closed: true } })).toBeNull();
+    expect(demandOf({ date: '2026-10-01', sales: 0 })).toBe(0);
+
+    const days = Array.from({ length: 28 }, (_, i) => {
+      const d = new Date(Date.UTC(2026, 8, 1 + i)).toISOString().slice(0, 10);
+      return { date: d, sales: 100 };
+    });
+    const conditions: ForecastConditions = { date: '2026-09-29', safetyRate: 0, currentStock: 0, alreadyOrdered: 0 };
+    const base = engine.forecast(days, target, conditions);
+    const withClosed = engine.forecast(
+      days.map((r, i) => (i % 7 === 3 ? { ...r, sales: 0, factors: { closed: true } } : r)),
+      target,
+      conditions,
+    );
+    expect(withClosed.adjustedDemand).toBe(base.adjustedDemand);
+  });
+});

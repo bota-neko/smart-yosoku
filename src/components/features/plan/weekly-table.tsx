@@ -12,6 +12,7 @@ import { useProducts, activeProducts } from '@/lib/products-store';
 import { useLocations, activeLocations, handlesProduct } from '@/lib/locations-store';
 import { useDeliveries, historyFromMap } from '@/lib/deliveries-store';
 import { useFactors, toDailyFactorsMap } from '@/lib/factors-store';
+import { useRestDays, isRestDay } from '@/lib/rest-days-store';
 import { formatNumber } from '@/lib/utils';
 import { addDays, dowLabel, type DailyRecord } from '@/domain';
 
@@ -24,6 +25,7 @@ export function WeeklyTable({ days }: { days: 7 | 14 }) {
   const { locations } = useLocations();
   const { map } = useDeliveries();
   const { map: factorMap } = useFactors();
+  const { map: restMap } = useRestDays();
 
   const activeProds = activeProducts(products);
   const activeLocs = activeLocations(locations);
@@ -49,7 +51,8 @@ export function WeeklyTable({ days }: { days: 7 | 14 }) {
       const date = addDays(start, i);
       const factor = factorsByDate[date];
       const cells = prods.map((p) => {
-        const locs = activeLocs.filter((l) => handlesProduct(l, p.id));
+        // その日「休み」のお店は含めない
+        const locs = activeLocs.filter((l) => handlesProduct(l, p.id) && !isRestDay(restMap, date, l.id));
         if (locs.length === 0) return { product: p, qty: null as number | null };
         const s = computeProductSummaryFor(p, locs, date, getHistory, factorsByDate[date]);
         totalsByProduct[p.id] = (totalsByProduct[p.id] ?? 0) + s.totalRecommended;
@@ -58,7 +61,7 @@ export function WeeklyTable({ days }: { days: 7 | 14 }) {
       return { date, dow: dowLabel(date), factor, cells };
     });
     return { rows, totals: totalsByProduct };
-  }, [activeProds, activeLocs, map, factorMap, days]);
+  }, [activeProds, activeLocs, map, factorMap, restMap, days]);
 
   const num = (p: ProductInfo, n: number) => formatNumber(n, p.allowDecimal ? 2 : 0);
 
