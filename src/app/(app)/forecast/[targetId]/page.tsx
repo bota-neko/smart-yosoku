@@ -28,6 +28,7 @@ import { useLocations } from '@/lib/locations-store';
 import { useProducts } from '@/lib/products-store';
 import { useDeliveries, historyFromMap } from '@/lib/deliveries-store';
 import { useFactors, toDailyFactorsMap } from '@/lib/factors-store';
+import { useSettings } from '@/lib/settings-store';
 import { formatNumber, formatPercent } from '@/lib/utils';
 import {
   addDays,
@@ -51,6 +52,7 @@ export default function ForecastDetailPage() {
   const { products } = useProducts();
   const { map } = useDeliveries();
   const { map: factorMap } = useFactors();
+  const { settings } = useSettings();
 
   const [locId, productId] = targetId.split('__');
   const seedEntry = findTarget(targetId);
@@ -95,7 +97,7 @@ export default function ForecastDetailPage() {
         safetyRates: location.safetyRates,
       }
     : { id: locId ?? '', name: locationName };
-  const shipment = computeStoreForecast(locLike, product!, date, history, factorsByDate[date]);
+  const shipment = computeStoreForecast(locLike, product!, date, history, factorsByDate[date], settings.safetyRate);
   const result: ForecastResult = shipment.result;
 
   // 参考指標も同じ履歴から算出
@@ -151,7 +153,7 @@ export default function ForecastDetailPage() {
             <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <span>
               {date}（{dowLabel(date)}曜日）に {locationName} へ卸すことをおすすめする数量です。
-              予測需要に安全分（安全率 {Math.round(shipment.safetyRate * 100)}％）を加え、現在庫と既発注を差し引いて算出しています。
+              予測需要に多めに作る分（{Math.round(shipment.safetyRate * 100)}％）を加え、現在庫と既発注を差し引いて算出しています。
               {shipment.caseSize != null
                 ? `1ケース${shipment.caseSize}${unit}のため、ケースの倍数へ切り上げています。`
                 : ''}

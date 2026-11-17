@@ -1,13 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronRight, Package, Store, MapPin } from 'lucide-react';
+import { ChevronRight, Package, Store, MapPin, Trash2 } from 'lucide-react';
 import { ApiKeyCard } from '@/components/features/settings/api-key-card';
 import { AreaSetting } from '@/components/features/factors/area-setting';
+import { SafetyRateCard } from '@/components/features/settings/safety-rate-card';
 import { useProducts, activeProducts } from '@/lib/products-store';
 import { useLocations, activeLocations } from '@/lib/locations-store';
 
-/** 設定：商品・お店・地域・APIキーをここにまとめる。 */
+/** 設定：商品・お店・多めに作る割合・地域・APIキーをここにまとめる。 */
 export default function SettingsPage() {
   const { products } = useProducts();
   const { locations } = useLocations();
@@ -24,6 +25,14 @@ export default function SettingsPage() {
           <SettingLink href="/products" icon={<Package className="h-5 w-5 text-primary" aria-hidden="true" />} label="商品" note={`${nProd} 品目`} />
           <SettingLink href="/locations" icon={<Store className="h-5 w-5 text-primary" aria-hidden="true" />} label="お店（卸先）" note={`${nLoc} 店`} />
         </ul>
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="flex items-center gap-1.5 text-sm font-semibold text-muted">
+          <Trash2 className="h-4 w-4" aria-hidden="true" />
+          多めに作る割合（廃棄の目安）
+        </h2>
+        <SafetyRateCard />
       </section>
 
       <section className="space-y-2">

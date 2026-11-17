@@ -15,6 +15,7 @@ import {
   X,
   Moon,
   CircleSlash,
+  Truck,
 } from 'lucide-react';
 import {
   Card,
@@ -29,7 +30,7 @@ import { useProducts, activeProducts, type Product } from '@/lib/products-store'
 import { useDeliveries } from '@/lib/deliveries-store';
 import { useFactors, type DayFactor } from '@/lib/factors-store';
 import { useLosses } from '@/lib/losses-store';
-import { useRestDays, isRestDay } from '@/lib/rest-days-store';
+import { useRestDays, restReason, REST_LABELS, type RestReason } from '@/lib/rest-days-store';
 import { SlipScanner, type SlipApply } from '@/components/features/slip/slip-scanner';
 import { addDays, dowLabel } from '@/domain';
 
@@ -43,7 +44,8 @@ import { addDays, dowLabel } from '@/domain';
  * - お店ごとに「記録済み / まだ」を一覧で表示
  * - 廃棄・売り切れ（ロス）と、特売・イベントなどは、ふだんは閉じておく
  * - 天気・気温・祝日は自動取得（入力不要）
- * - 0 と空欄を区別（空欄=未入力、0=納品ゼロ）
+ * - 空欄は「まだ入れていない」。保存すると空欄は 0（その商品は納品なし）として記録する
+ * - 納品がなかった日は理由を選ぶ：注文がなかった（全部0）／お店が休み／納品に行かなかった
  */
 export default function DeliveryInputPage() {
   const { locations: allLocs } = useLocations();
@@ -193,18 +195,27 @@ export default function DeliveryInputPage() {
     return { filled, total: list.length };
   };
 
-  /** 現在の日付・卸先の入力を納品実績ストアへ保存（'' は未入力=削除）。予測へ即反映。 */
+  /**
+   * 現在の日付・卸先の入力を納品実績ストアへ保存。予測へ即反映。
+   * 空欄は 0（曜日によって納めない商品など）として記録する。
+   */
   const handleSave = () => {
     if (!location) return;
+    const blanks = currentProducts.filter((p) => (values[key(locationId, p.id)] ?? '') === '').length;
     const entries = currentProducts.map((p) => {
       const raw = values[key(locationId, p.id)] ?? '';
-      return { productId: p.id, value: raw === '' ? null : Number(raw) };
+      return { productId: p.id, value: raw === '' ? 0 : Number(raw) };
+    });
+    setValues((prev) => {
+      const next = { ...prev };
+      for (const e of entries) next[key(locationId, e.productId)] = String(e.value);
+      return next;
     });
     clearDirty(locationId);
     saveValues(date, locationId, entries);
-    if (entries.some((e) => e.value !== null)) setRest(date, locationId, false);
+    setRest(date, locationId, false);
     setScanNotice(null);
-    setSavedAt(`${nowLabel()} に保存しました`);
+    setSavedAt(`${nowLabel()} に保存しました${blanks > 0 ? `（空欄の ${blanks} 品は 0 で記録）` : ''}`);
   };
 
   /** 納品なし：全商品を 0 で記録して保存（「売れなかった日」として見込みに使われる）。 */
@@ -222,8 +233,11 @@ export default function DeliveryInputPage() {
     setSavedAt(`${nowLabel()} に「納品なし（0）」で保存しました`);
   };
 
-  /** 休み：記録を消して「休み」にする（見込みの計算では無視、未来の日なら作る数を0に）。 */
-  const handleRest = () => {
+  /**
+   * 休み（お店が休み／納品に行かなかった）：記録を消して理由つきで印をつける。
+   * 見込みの計算では無視し、未来の日なら作る数から外す。
+   */
+  const handleRest = (reason: RestReason) => {
     if (!location) return;
     setValues((prev) => {
       const next = { ...prev };
@@ -232,7 +246,7 @@ export default function DeliveryInputPage() {
     });
     clearDirty(locationId);
     saveValues(date, locationId, currentProducts.map((p) => ({ productId: p.id, value: null })));
-    setRest(date, locationId, true);
+    setRest(date, locationId, reason);
     setScanNotice(null);
     setSavedAt(null);
   };
@@ -240,7 +254,9 @@ export default function DeliveryInputPage() {
   const isToday = date === getToday();
   /** 自店の店休日（その日の全お店が休み扱い） */
   const shopClosed = !!getFactors(date).closed;
-  const isRest = (l: WholesaleDest) => shopClosed || isRestDay(restMap, date, l.id);
+  const isRest = (l: WholesaleDest) => shopClosed || restReason(restMap, date, l.id) !== null;
+  /** 一覧・入力欄に出す休みの表示 */
+  const restLabel = (l: WholesaleDest) => (shopClosed ? '店休日' : REST_LABELS[restReason(restMap, date, l.id) ?? 'closed']);
   const recordedCount = locs.filter((l) => {
     if (isRest(l)) return true;
     const st = locationStatus(l);
@@ -348,8 +364,12 @@ export default function DeliveryInputPage() {
                     </span>
                     {isRest(loc) ? (
                       <span className="inline-flex items-center gap-1 text-base text-muted">
-                        <Moon className="h-5 w-5" aria-hidden="true" />
-                        {shopClosed ? '店休日' : '休み'}
+                        {restReason(restMap, date, loc.id) === 'skip' && !shopClosed ? (
+                          <Truck className="h-5 w-5" aria-hidden="true" />
+                        ) : (
+                          <Moon className="h-5 w-5" aria-hidden="true" />
+                        )}
+                        {restLabel(loc)}
                       </span>
                     ) : st.total === 0 ? (
                       <span className="text-sm text-muted">取扱商品なし</span>
@@ -403,11 +423,13 @@ export default function DeliveryInputPage() {
                 <Moon className="mt-0.5 h-5 w-5 shrink-0 text-muted" aria-hidden="true" />
                 {shopClosed
                   ? 'この日は店休日にしています。見込みの計算には使いません（「特売・イベント・店休日など」で外せます）。'
-                  : 'この日は「休み」にしています。記録はせず、見込みの計算にも使いません。'}
+                  : restReason(restMap, date, locationId) === 'skip'
+                    ? 'この日は「納品に行かなかった（納品なし）」にしています。記録はせず、見込みの計算にも使いません。'
+                    : 'この日は「お店が休み」にしています。記録はせず、見込みの計算にも使いません。'}
               </p>
               {!shopClosed ? (
                 <Button variant="outline" onClick={() => setRest(date, locationId, false)}>
-                  休みを取り消して入力する
+                  取り消して入力する
                 </Button>
               ) : null}
             </CardContent>
@@ -508,6 +530,9 @@ export default function DeliveryInputPage() {
               </div>
             ) : null}
             <div className="flex flex-wrap items-center justify-end gap-3 px-4 py-3">
+              {!savedAt && currentProducts.some((p) => (values[key(locationId, p.id)] ?? '') === '') ? (
+                <span className="text-sm text-muted">空欄は 0 で記録します</span>
+              ) : null}
               {savedAt ? (
                 <span className="inline-flex items-center gap-1 text-sm text-state-good" role="status">
                   <CopyCheck className="h-4 w-4" aria-hidden="true" />
@@ -521,19 +546,23 @@ export default function DeliveryInputPage() {
             </div>
             {currentProducts.length > 0 ? (
               <div className="space-y-2 bg-muted-bg/40 px-4 py-3">
-                <p className="text-sm text-muted">このお店に納品がなかった日は</p>
+                <p className="text-sm text-muted">このお店に納品がなかった日は、理由を選んでください</p>
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" onClick={handleNoDelivery}>
                     <CircleSlash className="h-4 w-4" aria-hidden="true" />
                     注文がなかった（全部0）
                   </Button>
-                  <Button size="sm" variant="outline" onClick={handleRest}>
+                  <Button size="sm" variant="outline" onClick={() => handleRest('closed')}>
                     <Moon className="h-4 w-4" aria-hidden="true" />
-                    お店が休みだった（記録しない）
+                    お店が休みだった
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => handleRest('skip')}>
+                    <Truck className="h-4 w-4" aria-hidden="true" />
+                    納品に行かなかった（納品なし）
                   </Button>
                 </div>
                 <p className="text-xs text-muted">
-                  「全部0」は売れなかった日として見込みに使います。臨時休業などは「休み」にすると、見込みの計算から外します。
+                  「全部0」は売れなかった日として見込みに使います。「お店が休み」「納品なし」は記録せず、見込みの計算から外します（先の日に付けると、その日の作る数からも外れます）。
                 </p>
               </div>
             ) : null}

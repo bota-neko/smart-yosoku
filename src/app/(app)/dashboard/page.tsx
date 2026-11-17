@@ -17,6 +17,7 @@ import { useLocations, activeLocations, handlesProduct } from '@/lib/locations-s
 import { useDeliveries, historyFromMap } from '@/lib/deliveries-store';
 import { useFactors, toDailyFactorsMap, WEATHER_LABELS } from '@/lib/factors-store';
 import { useRestDays, isRestDay } from '@/lib/rest-days-store';
+import { useSettings, DEFAULT_SAFETY_RATE } from '@/lib/settings-store';
 import { formatNumber } from '@/lib/utils';
 import { dowLabel } from '@/domain';
 
@@ -31,6 +32,8 @@ export default function PlanPage() {
   const { map } = useDeliveries();
   const { map: factorMap, getFactors } = useFactors();
   const { map: restMap } = useRestDays();
+  const { settings } = useSettings();
+  const globalRate = settings.safetyRate;
   const [view, setView] = useState<'tomorrow' | 'week'>('tomorrow');
 
   const today = getToday();
@@ -49,9 +52,35 @@ export default function PlanPage() {
         tomorrow,
         getHistory,
         factorsByDate[tomorrow],
+        globalRate,
       ),
     )
     .filter((s) => s.stores.length > 0);
+
+  // きょうの数（比較用）：記録済みのお店は実績、まだのお店は見込み
+  const todayClosed = !!getFactors(today).closed;
+  const todayByProduct = new Map<string, TodayInfo>(
+    prods.map((p) => {
+      const storesToday = todayClosed
+        ? []
+        : locs.filter((l) => handlesProduct(l, p.id) && !isRestDay(restMap, today, l.id));
+      const forecast = computeProductSummaryFor(p, storesToday, today, getHistory, factorsByDate[today], globalRate);
+      const byStore: Record<string, { qty: number; actual: boolean }> = {};
+      let total = 0;
+      let recorded = 0;
+      for (const sf of forecast.stores) {
+        const actual = map[`${today}|${sf.location.id}|${p.id}`];
+        const qty = actual != null ? actual : sf.shipUnits;
+        if (actual != null) recorded += 1;
+        byStore[sf.location.id] = { qty, actual: actual != null };
+        total += qty;
+      }
+      const n = forecast.stores.length;
+      const kind: TodayInfo['kind'] =
+        n === 0 ? 'none' : recorded === n ? 'actual' : recorded === 0 ? 'forecast' : 'mixed';
+      return [p.id, { total, kind, byStore }];
+    }),
+  );
 
   // きょうの納品がまだのお店（休み・店休日は除く）
   const notRecorded = getFactors(today).closed
@@ -151,12 +180,13 @@ export default function PlanPage() {
           ) : (
             <ul className="space-y-3">
               {summaries.map((s) => (
-                <ProductRow key={s.product.id} summary={s} />
+                <ProductRow key={s.product.id} summary={s} today={todayByProduct.get(s.product.id)} />
               ))}
             </ul>
           )}
           <p className="text-sm text-muted">
-            天気・特売・祝日を反映し、売り切れないよう少し多めの数にしています。商品を押すとお店ごとの内訳が見られます。
+            天気・特売・祝日を反映し、見込みに「多めに作る割合」（全体 {Math.round((globalRate ?? DEFAULT_SAFETY_RATE) * 100)}
+            ％・「設定」で変更）を足した数です。「きょう」は、記録済みのお店は実績、まだのお店は見込みの数です。商品を押すとお店ごとの内訳が見られます。
           </p>
         </>
       )}
@@ -164,20 +194,57 @@ export default function PlanPage() {
   );
 }
 
-/** 1商品ぶん：作る数を大きく。押すとお店ごとの内訳を開く。 */
-function ProductRow({ summary }: { summary: ProductSummary }) {
+/** きょうの数（比較用） */
+interface TodayInfo {
+  total: number;
+  /** actual=全店実績 / forecast=全店見込み / mixed=一部実績 / none=きょうは納品なし */
+  kind: 'actual' | 'forecast' | 'mixed' | 'none';
+  byStore: Record<string, { qty: number; actual: boolean }>;
+}
+
+const TODAY_KIND_LABEL: Record<TodayInfo['kind'], string> = {
+  actual: '実績',
+  forecast: '見込み',
+  mixed: '実績＋見込み',
+  none: '',
+};
+
+/** 1商品ぶん：作る数を大きく、きょうの数を並べて比べられるように。押すとお店ごとの内訳を開く。 */
+function ProductRow({ summary, today }: { summary: ProductSummary; today?: TodayInfo }) {
   const { product } = summary;
   const num = (n: number) => formatNumber(n, product.allowDecimal ? 2 : 0);
+  const diff = today && today.kind !== 'none' ? summary.totalRecommended - today.total : null;
   return (
     <li>
       <details className="group rounded-lg border border-border bg-surface">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 [&::-webkit-details-marker]:hidden">
-          <span className="flex items-center gap-2 text-lg font-medium">
+          <span className="flex items-start gap-2">
             <ChevronDown
-              className="h-5 w-5 shrink-0 text-muted transition-transform group-open:rotate-180"
+              className="mt-1 h-5 w-5 shrink-0 text-muted transition-transform group-open:rotate-180"
               aria-hidden="true"
             />
-            {product.name}
+            <span>
+              <span className="block text-lg font-medium">{product.name}</span>
+              {today ? (
+                <span className="block text-sm text-muted tabular">
+                  {today.kind === 'none' ? (
+                    'きょうは納品なし'
+                  ) : (
+                    <>
+                      きょう <span className="text-base font-semibold text-foreground">{num(today.total)}</span>
+                      {product.unit}（{TODAY_KIND_LABEL[today.kind]}）
+                      {diff != null && diff !== 0 ? (
+                        <span className="ml-1">
+                          → あしたは{diff > 0 ? `${num(diff)}多い` : `${num(-diff)}少ない`}
+                        </span>
+                      ) : diff === 0 ? (
+                        <span className="ml-1">→ あしたも同じ</span>
+                      ) : null}
+                    </>
+                  )}
+                </span>
+              ) : null}
+            </span>
           </span>
           <span className="tabular text-right">
             <span className="text-4xl font-extrabold leading-none text-recommend">{num(summary.totalRecommended)}</span>
@@ -185,7 +252,10 @@ function ProductRow({ summary }: { summary: ProductSummary }) {
           </span>
         </summary>
         <div className="border-t border-border px-4 py-3">
-          <p className="mb-2 text-sm text-muted">お店ごとの内訳</p>
+          <p className="mb-2 flex justify-between text-sm text-muted">
+            <span>お店ごとの内訳</span>
+            <span>きょう → あした</span>
+          </p>
           <ul className="divide-y divide-border">
             {summary.stores.map((s) => (
               <li key={s.targetId}>
@@ -199,6 +269,14 @@ function ProductRow({ summary }: { summary: ProductSummary }) {
                     {s.location.name}
                   </span>
                   <span className="inline-flex items-center gap-1 tabular text-base">
+                    {today?.byStore[s.location.id] ? (
+                      <span className="text-sm text-muted">
+                        {num(today.byStore[s.location.id].qty)}
+                        {today.byStore[s.location.id].actual ? '' : '（見込み）'} →
+                      </span>
+                    ) : (
+                      <span className="text-sm text-muted">なし →</span>
+                    )}
                     <span className="font-semibold">{num(s.shipUnits)}</span>
                     <span className="text-sm text-muted">{product.unit}</span>
                     {s.cases != null ? <span className="text-sm text-muted">（{s.cases}ケース）</span> : null}

@@ -13,6 +13,7 @@ import { useLocations, activeLocations, handlesProduct } from '@/lib/locations-s
 import { useDeliveries, historyFromMap } from '@/lib/deliveries-store';
 import { useFactors, toDailyFactorsMap } from '@/lib/factors-store';
 import { useRestDays, isRestDay } from '@/lib/rest-days-store';
+import { useSettings } from '@/lib/settings-store';
 import { formatNumber } from '@/lib/utils';
 import { addDays, dowLabel, type DailyRecord } from '@/domain';
 
@@ -26,6 +27,7 @@ export function WeeklyTable({ days }: { days: 7 | 14 }) {
   const { map } = useDeliveries();
   const { map: factorMap } = useFactors();
   const { map: restMap } = useRestDays();
+  const { settings } = useSettings();
 
   const activeProds = activeProducts(products);
   const activeLocs = activeLocations(locations);
@@ -54,14 +56,14 @@ export function WeeklyTable({ days }: { days: 7 | 14 }) {
         // その日「休み」のお店は含めない
         const locs = activeLocs.filter((l) => handlesProduct(l, p.id) && !isRestDay(restMap, date, l.id));
         if (locs.length === 0) return { product: p, qty: null as number | null };
-        const s = computeProductSummaryFor(p, locs, date, getHistory, factorsByDate[date]);
+        const s = computeProductSummaryFor(p, locs, date, getHistory, factorsByDate[date], settings.safetyRate);
         totalsByProduct[p.id] = (totalsByProduct[p.id] ?? 0) + s.totalRecommended;
         return { product: p, qty: s.totalRecommended };
       });
       return { date, dow: dowLabel(date), factor, cells };
     });
     return { rows, totals: totalsByProduct };
-  }, [activeProds, activeLocs, map, factorMap, restMap, days]);
+  }, [activeProds, activeLocs, map, factorMap, restMap, days, settings.safetyRate]);
 
   const num = (p: ProductInfo, n: number) => formatNumber(n, p.allowDecimal ? 2 : 0);
 

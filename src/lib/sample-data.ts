@@ -278,6 +278,8 @@ export interface ProductInfo {
   price?: number | null;
   /** 原価（円・任意）。ロス金額の算出に使う */
   cost?: number | null;
+  /** この商品の「多めに作る割合」（0-1）。未設定は全体の設定 */
+  safetyRate?: number | null;
 }
 export const PRODUCT_LIST: ProductInfo[] = PRODUCTS.map((p) => ({
   id: p.id,
@@ -322,11 +324,21 @@ export interface StoreForecast {
   safetyRate: number;
 }
 
-/** (卸先,商品) に適用する安全在庫率を解決する。 */
-export function resolveSafetyRate(location: LocationLike, productId: string): number {
+/**
+ * (卸先,商品) に適用する安全在庫率（多めに作る割合）を解決する。
+ * 優先順: お店×商品 → お店 → fallback（商品の設定 → 全体の設定 → 0.1）
+ */
+export function resolveSafetyRate(location: LocationLike, productId: string, fallback = 0.1): number {
   const perPair = location.safetyRates?.[productId];
   if (perPair != null && Number.isFinite(perPair)) return perPair;
   if (location.safetyRate != null && Number.isFinite(location.safetyRate)) return location.safetyRate;
+  return fallback;
+}
+
+/** 商品の設定 → 全体の設定 → 0.1 の順で、既定の割合を決める。 */
+export function productSafetyRate(product: { safetyRate?: number | null }, globalRate?: number): number {
+  if (product.safetyRate != null && Number.isFinite(product.safetyRate)) return product.safetyRate;
+  if (globalRate != null && Number.isFinite(globalRate)) return globalRate;
   return 0.1;
 }
 
@@ -345,8 +357,10 @@ export function computeStoreForecast(
   date: string,
   history: DailyRecord[],
   factors?: DailyFactors,
+  /** 全体の「多めに作る割合」（設定画面） */
+  globalSafetyRate?: number,
 ): StoreForecast {
-  const safetyRate = resolveSafetyRate(location, product.id);
+  const safetyRate = resolveSafetyRate(location, product.id, productSafetyRate(product, globalSafetyRate));
   const meta: ForecastTargetMeta = {
     id: `${location.id}__${product.id}`,
     name: product.name,
@@ -416,9 +430,10 @@ export function computeProductSummaryFor(
   date: string,
   getHistory: (locationId: string, productId: string) => DailyRecord[],
   factors?: DailyFactors,
+  globalSafetyRate?: number,
 ): ProductSummary {
   const stores: StoreForecast[] = locations.map((location) =>
-    computeStoreForecast(location, product, date, getHistory(location.id, product.id), factors),
+    computeStoreForecast(location, product, date, getHistory(location.id, product.id), factors, globalSafetyRate),
   );
   const sumResult = (pick: (r: ForecastResult) => number) =>
     stores.reduce((acc, s) => acc + pick(s.result), 0);

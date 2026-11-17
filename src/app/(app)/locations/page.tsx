@@ -293,11 +293,11 @@ export default function LocationsPage() {
                           inputMode="numeric"
                           value={locSafetyPct(l)}
                           onChange={(e) => setLocSafety(l, e.target.value.replace(/[^0-9]/g, ''))}
-                          placeholder="10"
+                          placeholder="—"
                           aria-label={`${l.name} のゆとり（％）`}
                           className="h-9 w-16 rounded-md border border-border bg-surface px-2 text-right text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                         />
-                        <span className="text-muted">％（未入力=既定10％）</span>
+                        <span className="text-muted">％（未入力＝「設定」の割合）</span>
                       </label>
                     </div>
 
@@ -338,7 +338,7 @@ export default function LocationsPage() {
                                     inputMode="numeric"
                                     value={pairSafetyPct(l, p.id)}
                                     onChange={(e) => setPairSafety(l, p.id, e.target.value.replace(/[^0-9]/g, ''))}
-                                    placeholder={locSafetyPct(l) || '10'}
+                                    placeholder={locSafetyPct(l) || '—'}
                                     aria-label={`${l.name} の ${p.name} のゆとり（％）`}
                                     className="h-9 w-14 rounded-md border border-border bg-surface px-2 text-right text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                                   />

@@ -19,6 +19,10 @@ export interface Product {
   cost?: number | null;
   /** 1ケースあたりの入数（>1でケース運用。未設定=ばら） */
   caseSize?: number | null;
+  /** この商品の「多めに作る割合」（0-1）。未設定は全体の設定を使う */
+  safetyRate?: number | null;
+  /** safetyRate を変えた日（YYYY-MM-DD）。見直しはこの日以降の記録で判断する */
+  safetyRateSince?: string | null;
   active: boolean;
 }
 

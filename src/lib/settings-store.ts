@@ -14,7 +14,18 @@ export interface OrgSettings {
   region?: string;
   latitude: number;
   longitude: number;
+  /**
+   * 全体の「多めに作る割合」（0-1・廃棄の目安）。未設定は 0.1。
+   * 商品・お店ごとの設定があれば、そちらが優先。
+   */
+  safetyRate?: number;
+  /** safetyRate を変えた日（YYYY-MM-DD） */
+  safetyRateSince?: string;
 }
+
+/** 多めに作る割合の選択肢（％） */
+export { SAFETY_STEPS_PCT as SAFETY_STEPS } from './safety-review';
+export const DEFAULT_SAFETY_RATE = 0.1;
 
 /** 既定は鹿児島市（サンプルのさつま食品に合わせる）。 */
 export const DEFAULT_SETTINGS: OrgSettings = {
@@ -56,9 +67,14 @@ export function useSettings() {
     };
   }, []);
 
-  const setArea = useCallback((s: OrgSettings) => write(s), []);
+  // 他の設定（多めに作る割合など）を消さないよう、既存の値に重ねて保存
+  const setArea = useCallback((s: OrgSettings) => write({ ...read(), ...s }), []);
+  const setSafetyRate = useCallback(
+    (rate: number, since: string) => write({ ...read(), safetyRate: rate, safetyRateSince: since }),
+    [],
+  );
 
-  return { settings, setArea };
+  return { settings, setArea, setSafetyRate };
 }
 
 /** 地域設定を既定へ戻す。 */
